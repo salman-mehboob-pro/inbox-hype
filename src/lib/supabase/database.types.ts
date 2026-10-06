@@ -916,6 +916,21 @@ export type Database = {
         }[]
       }
       campaign_stats: { Args: { p_campaign_id: string }; Returns: Json }
+      dashboard_activity: {
+        Args: { p_limit?: number; p_workspace_id: string }
+        Returns: {
+          campaign_id: string | null
+          campaign_name: string | null
+          created_at: string
+          id: number
+          lead_email: string | null
+          lead_id: string | null
+          lead_name: string | null
+          step_position: number | null
+          type: string
+        }[]
+      }
+      dashboard_stats: { Args: { p_days?: number; p_workspace_id: string }; Returns: Json }
       import_leads: {
         Args: {
           p_rows: Json
