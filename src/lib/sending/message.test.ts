@@ -9,6 +9,7 @@ import {
   unsubscribeUrl,
   type BuildMessageInput,
 } from "./message";
+import { autoLinkUrls } from "./tracking";
 
 const lead = { email: "ann@acme.test", first_name: "Ann", last_name: "Lee", company: "Acme", website: "acme.test" };
 const account = { email: "me@sender.test", from_name: "Sam", signature: "Sam\nBuildberg" };
@@ -262,5 +263,38 @@ describe("tracking", () => {
     const own = { ...linkStep, body: '<p><a href="https://app.test/pricing">us</a></p>' };
     const m = build({ step: own, tracking: tracking(false, true) });
     expect(m.html).toContain('href="https://app.test/pricing"');
+  });
+
+  it("a web address written as plain text (like {{website}}) becomes a tracked link", () => {
+    const plain = { position: 1, subject: "s", body: "<p>Check out {{website}} now.</p>", body_format: "rich" };
+    const m = build({ step: plain, lead: { ...lead, website: "https://acme.test" }, tracking: tracking(false, true) });
+    expect(m.html).toContain(`href="https://app.test/c/${ID}?u=${encodeURIComponent("https://acme.test")}&amp;s=`);
+    expect(m.text).toContain("https://acme.test");
+    expect(m.text).not.toContain("/c/");
+  });
+
+  it("a plain-text web address is a real link even when click tracking is off", () => {
+    const plain = { position: 1, subject: "s", body: "<p>Check out {{website}}.</p>", body_format: "rich" };
+    const m = build({ step: plain, lead: { ...lead, website: "https://acme.test" }, tracking: tracking(true, false) });
+    expect(m.html).toContain('<a href="https://acme.test">https://acme.test</a>.');
+    expect(m.html).not.toContain("/c/");
+  });
+});
+
+describe("autoLinkUrls", () => {
+  it("links bare addresses and keeps sentence punctuation outside the link", () => {
+    expect(autoLinkUrls("<p>See https://acme.test/a?x=1&amp;y=2, then go.</p>")).toBe(
+      '<p>See <a href="https://acme.test/a?x=1&amp;y=2">https://acme.test/a?x=1&amp;y=2</a>, then go.</p>',
+    );
+  });
+
+  it("leaves existing links, attributes and style blocks alone", () => {
+    const html =
+      '<style>a{background:url(https://x.test/i.png)}</style><p><a href="https://acme.test">https://acme.test</a> <img src="https://x.test/p.png"></p>';
+    expect(autoLinkUrls(html)).toBe(html);
+  });
+
+  it("does not link text that only starts with http", () => {
+    expect(autoLinkUrls("<p>http:// and https://localhost</p>")).toBe("<p>http:// and https://localhost</p>");
   });
 });

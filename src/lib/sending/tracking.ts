@@ -63,6 +63,28 @@ export function rewriteLinks(html: string, rewrite: (url: string) => string | nu
   });
 }
 
+// Turns web addresses written as plain text into real links (for example the
+// result of {{website}}). Mail apps like Gmail show such text as a link, but the
+// email itself has no <a>, so there would be nothing to track. Text that is
+// already inside a link, and tag attributes, are left alone.
+const BARE_URL = /\bhttps?:\/\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'])+/gi;
+
+export function autoLinkUrls(html: string): string {
+  return html
+    .split(/(<a\b[\s\S]*?<\/a\s*>|<style\b[\s\S]*?<\/style\s*>|<[^>]*>)/gi)
+    .map((part, index) => {
+      if (index % 2 === 1) return part; // a tag, an existing link or a style block
+      return part.replace(BARE_URL, (found) => {
+        // Sentence punctuation right after the address is not part of it.
+        const trimmed = found.replace(/(?:[.,;:!?)\]]|&amp;)+$/, "");
+        const rest = found.slice(trimmed.length);
+        if (!/^https?:\/\/[^/?#\s]+\.[^/?#\s]+/i.test(trimmed)) return found;
+        return `<a href="${trimmed}">${trimmed}</a>${rest}`;
+      });
+    })
+    .join("");
+}
+
 // A 1x1 image at the end of the email body.
 export function addOpenPixel(html: string, pixelUrl: string): string {
   const pixel = `<img src="${attr(pixelUrl)}" width="1" height="1" alt="" style="width:1px;height:1px;border:0">`;

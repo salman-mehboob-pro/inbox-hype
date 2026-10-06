@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { convert } from "html-to-text";
 import { escapeHtml, looksLikeHtml, render, textToHtml, type TemplateLead } from "@/lib/email/template";
-import { addOpenPixel, openPixelUrl, rewriteLinks, trackedLinkUrl } from "./tracking";
+import { addOpenPixel, autoLinkUrls, openPixelUrl, rewriteLinks, trackedLinkUrl } from "./tracking";
 
 // Builds the email that one lead receives (pure, no I/O).
 //   subject + body -> variables + spin text -> safe HTML + plain-text part.
@@ -219,7 +219,9 @@ export function buildMessage(input: BuildMessageInput): BuiltMessage {
   const source = step.body_format === "html" || looksLikeHtml(step.body) ? step.body : textToHtml(step.body);
   const renderedBody = render(source, lead, sender, `${seed}:body`, { html: true });
   renderedBody.missing.forEach((m) => missing.add(m));
-  const body = sanitizeEmailHtml(renderedBody.text);
+  // Plain-text web addresses (e.g. from {{website}}) become real links, so they
+  // can be clicked in every mail app and counted when click tracking is on.
+  const body = autoLinkUrls(sanitizeEmailHtml(renderedBody.text));
 
   // Everything after the body: signature (plain text typed in the inbox settings,
   // may use variables) and the unsubscribe footer.
