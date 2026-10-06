@@ -13,7 +13,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .select("id", { count: "exact", head: true })
     .eq("workspace_id", workspace.id)
     .eq("direction", "inbound")
-    .eq("is_read", false);
+    .eq("is_read", false)
+    .is("deleted_at", null);
 
   return (
     <SidebarProvider>

@@ -2,18 +2,13 @@ import { ArrowLeftIcon, MailWarningIcon } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
+import { CategoryBadge } from "./categories";
 import { MessageBody } from "./email-frame";
+import { KIND_LABEL, KindBadge } from "./kind-badge";
 import { LocalTime } from "./local-time";
 import { MarkRead } from "./mark-read";
 import { ReplyBox } from "./reply-box";
-
-export const KIND_LABEL: Record<string, string> = { reply: "Reply", auto_reply: "Out of office", bounce: "Bounced" };
-
-export function KindBadge({ kind }: { kind: string }) {
-  if (kind === "bounce") return <Badge variant="destructive">{KIND_LABEL.bounce}</Badge>;
-  if (kind === "auto_reply") return <Badge variant="secondary">{KIND_LABEL.auto_reply}</Badge>;
-  return <Badge variant="outline">{KIND_LABEL.reply}</Badge>;
-}
+import { ThreadActions } from "./thread-actions";
 
 type Item = {
   key: string;
@@ -32,7 +27,12 @@ type Item = {
 // answered, what we answered).
 export async function Thread({ id, backHref }: { id: string; backHref: string }) {
   const supabase = await createClient();
-  const { data: message, error } = await supabase.from("inbox_messages").select("*").eq("id", id).maybeSingle();
+  const { data: message, error } = await supabase
+    .from("inbox_messages")
+    .select("*")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
   if (error) throw error;
   if (!message) {
     return (
@@ -64,10 +64,13 @@ export async function Thread({ id, backHref }: { id: string; backHref: string })
     leadId && campaignId
       ? supabase
           .from("inbox_messages")
-          .select("id, direction, kind, from_email, from_name, to_email, subject, text_body, html_body, received_at")
+          .select(
+            "id, direction, kind, from_email, from_name, to_email, subject, text_body, html_body, received_at, category, is_read",
+          )
           .eq("lead_id", leadId)
           .eq("campaign_id", campaignId)
           .eq("email_account_id", inboxId)
+          .is("deleted_at", null)
       : Promise.resolve({ data: [], error: null }),
   ]);
   for (const result of [inbox, lead, campaign, sent, others]) if (result.error) throw result.error;
@@ -116,13 +119,22 @@ export async function Thread({ id, backHref }: { id: string; backHref: string })
   }
   items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
+  // The category of the conversation = the newest one that was set on any message of it.
+  const thread = others.data ?? [];
+  const category =
+    [...thread]
+      .filter((m) => m.category)
+      .sort((a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime())[0]?.category ??
+    message.category;
+  const hasUnread = !message.is_read || thread.some((m) => m.direction === "inbound" && !m.is_read);
+
   const leadName = lead.data
     ? [lead.data.first_name, lead.data.last_name].filter(Boolean).join(" ") || lead.data.email
     : message.from_name || message.from_email;
 
   return (
     <div className="grid gap-4">
-      {!message.is_read && <MarkRead id={message.id} />}
+      {hasUnread && <MarkRead id={message.id} />}
 
       <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground lg:hidden">
         <ArrowLeftIcon className="size-4" />
@@ -130,9 +142,13 @@ export async function Thread({ id, backHref }: { id: string; backHref: string })
       </Link>
 
       <div className="grid gap-1.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-semibold tracking-tight">{message.subject || "(no subject)"}</h2>
-          <KindBadge kind={message.kind} />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">{message.subject || "(no subject)"}</h2>
+            <KindBadge kind={message.kind} />
+            <CategoryBadge category={category} />
+          </div>
+          <ThreadActions messageId={message.id} category={category} backHref={backHref} />
         </div>
         <p className="text-sm text-muted-foreground">
           {lead.data ? (

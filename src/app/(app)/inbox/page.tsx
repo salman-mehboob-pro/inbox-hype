@@ -3,13 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { z } from "zod";
 import { PageHeader } from "@/components/page-header";
-import { cn } from "@/lib/utils";
 import { snippet } from "@/lib/inbox/parse";
-import { timeAgo } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { CATEGORY_KEYS } from "./categories";
 import { CheckRepliesButton, InboxToolbar } from "./inbox-toolbar";
-import { KindBadge, Thread } from "./thread";
+import { Thread } from "./thread";
+import { ThreadList, type ThreadRow } from "./thread-list";
 
 export const metadata: Metadata = { title: "Unibox" };
 
@@ -30,6 +31,10 @@ function cleanSearch(q: string) {
 export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
   const params = await searchParams;
   const filter = FILTERS.find((f) => f.key === params.filter)?.key ?? "all";
+  const category =
+    typeof params.category === "string" && (params.category === "none" || (CATEGORY_KEYS as string[]).includes(params.category))
+      ? params.category
+      : "";
   const q = typeof params.q === "string" ? cleanSearch(params.q) : "";
   const page = Math.max(1, Number(params.page) || 1);
   const idParam = z.uuid().safeParse(params.id);
@@ -40,6 +45,7 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
   const [list, unread, readable] = await Promise.all([
     supabase.rpc("unibox_list", {
       p_filter: filter,
+      p_category: category || undefined,
       p_search: q || undefined,
       p_limit: PAGE_SIZE,
       p_offset: (page - 1) * PAGE_SIZE,
@@ -49,7 +55,8 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", workspace.id)
       .eq("direction", "inbound")
-      .eq("is_read", false),
+      .eq("is_read", false)
+      .is("deleted_at", null),
     supabase
       .from("email_accounts")
       .select("id", { count: "exact", head: true })
@@ -60,17 +67,19 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
   if (unread.error) throw unread.error;
   if (readable.error) throw readable.error;
 
-  const messages = list.data;
-  const total = messages[0]?.total_count ?? 0;
+  const threads = list.data;
+  const total = threads[0]?.total_count ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const selectedId = idParam.success ? idParam.data : undefined;
-  // On wide screens the newest message is open by default.
-  const openId = selectedId ?? messages[0]?.id;
+  // Nothing is open until the user picks a conversation: opening one marks it as
+  // read, so opening the newest one automatically would hide new replies.
+  const openId = selectedId;
 
   const href = (next: { id?: string; filter?: string; page?: number }) => {
     const sp = new URLSearchParams();
     const f = next.filter ?? filter;
     if (f !== "all") sp.set("filter", f);
+    if (category) sp.set("category", category);
     if (q) sp.set("q", q);
     if (next.page && next.page > 1) sp.set("page", String(next.page));
     if (next.id) sp.set("id", next.id);
@@ -78,7 +87,21 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
     return s ? `/inbox?${s}` : "/inbox";
   };
 
-  const isEmpty = total === 0 && filter === "all" && !q;
+  const rows: ThreadRow[] = threads.map((t) => ({
+    id: t.id,
+    href: href({ id: t.id, page }),
+    kind: t.kind,
+    name: t.lead_name || t.from_name || t.from_email,
+    subject: t.subject,
+    preview: snippet(t.preview),
+    receivedAt: t.received_at,
+    unread: !t.is_read,
+    messageCount: Number(t.message_count),
+    category: t.category,
+    campaignName: t.campaign_name,
+  }));
+
+  const isEmpty = total === 0 && filter === "all" && !q && !category;
 
   return (
     <>
@@ -103,9 +126,9 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start">
           <section className={cn("grid gap-3", selectedId && "hidden lg:grid")}>
-            <InboxToolbar q={q} filter={filter} />
+            <InboxToolbar q={q} filter={filter} category={category} />
             <nav className="flex flex-wrap gap-1" aria-label="Filter messages">
               {FILTERS.map((f) => (
                 <Link
@@ -122,40 +145,12 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
               ))}
             </nav>
 
-            {messages.length === 0 ? (
+            {rows.length === 0 ? (
               <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                No messages match.
+                No conversations match.
               </p>
             ) : (
-              <ul className="divide-y overflow-hidden rounded-xl border">
-                {messages.map((m) => (
-                  <li key={m.id}>
-                    <Link
-                      href={href({ id: m.id, page })}
-                      className={cn(
-                        "grid gap-0.5 px-3 py-2.5 text-sm transition-colors hover:bg-muted/60",
-                        m.id === openId && "bg-muted",
-                      )}
-                    >
-                      <span className="flex items-center gap-2">
-                        {!m.is_read && <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
-                        <span className={cn("min-w-0 flex-1 truncate", !m.is_read && "font-semibold")}>
-                          {m.lead_name || m.from_name || m.from_email}
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground" suppressHydrationWarning>
-                          {timeAgo(m.received_at)}
-                        </span>
-                      </span>
-                      <span className={cn("truncate", !m.is_read && "font-medium")}>{m.subject || "(no subject)"}</span>
-                      <span className="line-clamp-2 text-xs text-muted-foreground">{snippet(m.preview) || " "}</span>
-                      <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        {m.kind !== "reply" && <KindBadge kind={m.kind} />}
-                        {m.campaign_name && <span className="truncate">{m.campaign_name}</span>}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <ThreadList rows={rows} openId={openId} clearHref={href({})} />
             )}
 
             {pages > 1 && (
@@ -174,7 +169,7 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
               <Thread id={openId} backHref={href({ page })} />
             ) : (
               <p className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-                Select a message to read it.
+                Select a conversation to read it.
               </p>
             )}
           </section>

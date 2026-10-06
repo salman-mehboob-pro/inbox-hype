@@ -396,6 +396,8 @@ export type Database = {
       inbox_messages: {
         Row: {
           campaign_id: string | null
+          category: string | null
+          deleted_at: string | null
           created_at: string
           direction: string
           email_account_id: string
@@ -420,6 +422,8 @@ export type Database = {
         }
         Insert: {
           campaign_id?: string | null
+          category?: string | null
+          deleted_at?: string | null
           created_at?: string
           direction?: string
           email_account_id: string
@@ -444,6 +448,8 @@ export type Database = {
         }
         Update: {
           campaign_id?: string | null
+          category?: string | null
+          deleted_at?: string | null
           created_at?: string
           direction?: string
           email_account_id?: string
@@ -951,11 +957,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      unibox_bulk: {
+        Args: { p_action: string; p_ids: string[]; p_value?: string }
+        Returns: number
+      }
       unibox_list: {
-        Args: { p_filter?: string; p_limit?: number; p_offset?: number; p_search?: string }
+        Args: { p_category?: string; p_filter?: string; p_limit?: number; p_offset?: number; p_search?: string }
         Returns: {
           campaign_id: string
           campaign_name: string
+          category: string
           from_email: string
           from_name: string
           id: string
@@ -964,10 +975,12 @@ export type Database = {
           kind: string
           lead_id: string
           lead_name: string
+          message_count: number
           preview: string
           received_at: string
           subject: string
           total_count: number
+          unread_count: number
         }[]
       }
       workspace_custom_field_keys: {

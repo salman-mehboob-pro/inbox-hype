@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { CATEGORY_KEYS } from "./categories";
 import { runInboxSync, type SyncSummary } from "@/lib/inbox/sync";
 import { sendManualReply } from "@/lib/inbox/reply";
 import { logger } from "@/lib/logger";
@@ -20,14 +21,42 @@ export async function markMessageRead(id: string): Promise<InboxActionResult> {
   if (!parsed.success) return { ok: false };
   await getCurrentWorkspace();
   const supabase = await createClient();
-  // RLS: only the user's own workspace. Only is_read can be changed.
-  const { error } = await supabase.from("inbox_messages").update({ is_read: true }).eq("id", parsed.data).eq("is_read", false);
+  // Opening a conversation marks the whole conversation as read (RLS: own workspace only).
+  const { error } = await supabase.rpc("unibox_bulk", { p_ids: [parsed.data], p_action: "read" });
   if (error) {
     logger.error("mark message read failed", { error, id });
     return { ok: false };
   }
   revalidatePath("/inbox");
   return { ok: true };
+}
+
+const bulkSchema = z.object({
+  // One message id per selected conversation (the list sends the newest).
+  ids: z.array(z.uuid()).min(1, "Select at least one conversation.").max(200, "Select at most 200 at a time."),
+  action: z.enum(["delete", "read", "unread", "category"]),
+  // For "category": the category, or null to remove it.
+  value: z.enum(CATEGORY_KEYS).nullable().optional(),
+});
+
+// Delete / mark read / mark unread / set a category, on whole conversations.
+export async function bulkAction(input: unknown): Promise<InboxActionResult & { count?: number }> {
+  const parsed = bulkSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the selection." };
+  await getCurrentWorkspace();
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("unibox_bulk", {
+    p_ids: parsed.data.ids,
+    p_action: parsed.data.action,
+    p_value: parsed.data.action === "category" ? (parsed.data.value ?? undefined) : undefined,
+  });
+  if (error) {
+    logger.error("unibox bulk action failed", { error, action: parsed.data.action });
+    return { ok: false, error: GENERIC_ERROR };
+  }
+  revalidatePath("/inbox");
+  return { ok: true, count: data ?? 0 };
 }
 
 // Look for new replies and bounces now (instead of waiting for the next tick).
