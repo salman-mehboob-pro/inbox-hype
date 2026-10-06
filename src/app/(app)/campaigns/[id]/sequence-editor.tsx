@@ -30,7 +30,15 @@ import {
 import { saveSequence } from "../actions";
 import { MAX_STEPS } from "../schema";
 
-type Step = { key: string; id?: string; delay_days: number; subject: string; body: string; body_format: BodyFormat };
+type Step = {
+  key: string;
+  id?: string;
+  delay_days: number;
+  delay_hours: number;
+  subject: string;
+  body: string;
+  body_format: BodyFormat;
+};
 
 let keySeq = 0;
 const newKey = () => `new-${++keySeq}`;
@@ -39,6 +47,7 @@ type InitialStep = {
   id: string;
   position: number;
   delay_days: number;
+  delay_hours: number;
   subject: string;
   body: string;
   body_format: string;
@@ -49,7 +58,15 @@ function toState(rows: InitialStep[]): Step[] {
     const format: BodyFormat = s.body_format === "html" ? "html" : "rich";
     // Bodies saved before the rich editor were plain text.
     const body = format === "rich" && s.body && !looksLikeHtml(s.body) ? textToHtml(s.body) : s.body;
-    return { key: s.id, id: s.id, delay_days: s.delay_days, subject: s.subject, body, body_format: format };
+    return {
+      key: s.id,
+      id: s.id,
+      delay_days: s.delay_days,
+      delay_hours: s.delay_hours,
+      subject: s.subject,
+      body,
+      body_format: format,
+    };
   });
 }
 
@@ -103,6 +120,7 @@ export function SequenceEditor({
       const payload = steps.map((s, i) => ({
         id: s.id,
         delay_days: i === 0 ? 0 : s.delay_days,
+        delay_hours: i === 0 ? 0 : s.delay_hours,
         subject: s.subject,
         body: s.body,
         body_format: s.body_format,
@@ -113,7 +131,12 @@ export function SequenceEditor({
         // Link new steps to their saved rows (keys stay the same so the
         // editors don't remount).
         const ids = res.stepIds ?? [];
-        const next = steps.map((s, i) => ({ ...s, id: ids[i] ?? s.id, delay_days: i === 0 ? 0 : s.delay_days }));
+        const next = steps.map((s, i) => ({
+          ...s,
+          id: ids[i] ?? s.id,
+          delay_days: i === 0 ? 0 : s.delay_days,
+          delay_hours: i === 0 ? 0 : s.delay_hours,
+        }));
         setSteps(next);
         setSaved(JSON.stringify(next));
       } else toast.error(res.error);
@@ -147,10 +170,22 @@ export function SequenceEditor({
                   className="h-7 w-16 text-center"
                   value={step.delay_days}
                   onChange={(e) =>
-                    update(step.key, { delay_days: Math.max(0, Math.min(365, Number(e.target.value) || 0)) })
+                    update(step.key, { delay_days: Math.max(0, Math.min(365, Math.trunc(Number(e.target.value)) || 0)) })
                   }
                 />
-                {step.delay_days === 1 ? "day" : "days"} after step {i}, then send:
+                {step.delay_days === 1 ? "day" : "days"}
+                <Input
+                  aria-label={`Hours to wait before step ${i + 1}`}
+                  type="number"
+                  min={0}
+                  max={23}
+                  className="h-7 w-16 text-center"
+                  value={step.delay_hours}
+                  onChange={(e) =>
+                    update(step.key, { delay_hours: Math.max(0, Math.min(23, Math.trunc(Number(e.target.value)) || 0)) })
+                  }
+                />
+                {step.delay_hours === 1 ? "hour" : "hours"} after step {i}, then send:
               </div>
             )}
             <Card>
@@ -269,7 +304,7 @@ export function SequenceEditor({
           onClick={() =>
             setSteps((prev) => [
               ...prev,
-              { key: newKey(), delay_days: 3, subject: "", body: "", body_format: "rich" },
+              { key: newKey(), delay_days: 3, delay_hours: 0, subject: "", body: "", body_format: "rich" },
             ])
           }
         >

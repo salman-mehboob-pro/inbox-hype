@@ -77,7 +77,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
   const [steps, accounts, chosen, campaignLeads, tags, customKeys, sampleLead, ...statusCounts] = await Promise.all([
     supabase
       .from("sequence_steps")
-      .select("id, position, delay_days, subject, body, body_format")
+      .select("id, position, delay_days, delay_hours, subject, body, body_format")
       .eq("campaign_id", id)
       .order("position"),
     supabase
@@ -215,6 +215,8 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
             accounts={accounts.data ?? []}
             initial={{
               daily_limit: String(campaign.daily_limit),
+              gap_min_minutes: String(campaign.gap_min_minutes),
+              gap_max_minutes: String(campaign.gap_max_minutes),
               track_opens: campaign.track_opens,
               track_clicks: campaign.track_clicks,
               stop_on_reply: campaign.stop_on_reply,

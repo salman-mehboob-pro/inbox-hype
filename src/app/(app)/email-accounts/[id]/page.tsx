@@ -92,8 +92,6 @@ export default async function EmailAccountPage({ params }: PageProps<"/email-acc
           initial={{
             fromName: account.from_name,
             dailyLimit: String(account.daily_limit),
-            minDelaySeconds: String(account.min_delay_seconds),
-            maxDelaySeconds: String(account.max_delay_seconds),
             signature: account.signature,
           }}
         />

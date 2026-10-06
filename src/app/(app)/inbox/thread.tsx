@@ -2,7 +2,7 @@ import { ArrowLeftIcon, MailWarningIcon } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
-import { EmailFrame } from "./email-frame";
+import { MessageBody } from "./email-frame";
 import { LocalTime } from "./local-time";
 import { MarkRead } from "./mark-read";
 import { ReplyBox } from "./reply-box";
@@ -167,11 +167,7 @@ export async function Thread({ id, backHref }: { id: string; backHref: string })
               </span>
             </summary>
             <div className="border-t p-3">
-              {item.html ? (
-                <EmailFrame html={item.html} title={`${item.label}: ${item.subject}`} />
-              ) : (
-                <pre className="font-sans text-sm whitespace-pre-wrap">{item.text?.trim() || "(empty message)"}</pre>
-              )}
+              <MessageBody html={item.html} text={item.text} title={`${item.label}: ${item.subject}`} />
             </div>
           </details>
         ))}

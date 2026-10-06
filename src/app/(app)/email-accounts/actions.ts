@@ -103,8 +103,6 @@ export async function createEmailAccount(input: unknown): Promise<ActionResult> 
     imap_secure: imap?.secure ?? true,
     imap_username: imap?.username ?? null,
     daily_limit: v.dailyLimit,
-    min_delay_seconds: v.minDelaySeconds,
-    max_delay_seconds: v.maxDelaySeconds,
     status: "active",
     last_tested_at: new Date().toISOString(),
   });
@@ -171,8 +169,6 @@ export async function updateEmailAccountSettings(id: string, input: unknown): Pr
     .update({
       from_name: v.fromName,
       daily_limit: v.dailyLimit,
-      min_delay_seconds: v.minDelaySeconds,
-      max_delay_seconds: v.maxDelaySeconds,
       signature: v.signature,
     })
     .eq("id", account.id);

@@ -14,15 +14,7 @@ const port = z.coerce.number().int().min(1, "Invalid port").max(65535, "Invalid 
 const sendingSettings = {
   fromName: z.string().trim().max(100, "Max 100 characters").default(""),
   dailyLimit: z.coerce.number().int().min(1, "At least 1").max(500, "At most 500"),
-  minDelaySeconds: z.coerce.number().int().min(0).max(3600, "At most 3600"),
-  maxDelaySeconds: z.coerce.number().int().min(0).max(3600, "At most 3600"),
 };
-
-function checkDelays(v: { minDelaySeconds: number; maxDelaySeconds: number }, ctx: z.RefinementCtx) {
-  if (v.maxDelaySeconds < v.minDelaySeconds) {
-    ctx.addIssue({ code: "custom", path: ["maxDelaySeconds"], message: "Must be ≥ the minimum gap" });
-  }
-}
 
 export const createAccountSchema = z
   .object({
@@ -43,7 +35,6 @@ export const createAccountSchema = z
     ...sendingSettings,
   })
   .superRefine((v, ctx) => {
-    checkDelays(v, ctx);
     if (!v.imapEnabled) return;
     if (!hostname.safeParse(v.imapHost ?? "").success) {
       ctx.addIssue({ code: "custom", path: ["imapHost"], message: "Enter a host name like imap.example.com" });
@@ -58,9 +49,10 @@ export const createAccountSchema = z
 
 export type CreateAccountInput = z.input<typeof createAccountSchema>;
 
-export const settingsSchema = z
-  .object({ ...sendingSettings, signature: z.string().max(5000, "Max 5000 characters").default("") })
-  .superRefine(checkDelays);
+export const settingsSchema = z.object({
+  ...sendingSettings,
+  signature: z.string().max(5000, "Max 5000 characters").default(""),
+});
 
 export type SettingsInput = z.input<typeof settingsSchema>;
 

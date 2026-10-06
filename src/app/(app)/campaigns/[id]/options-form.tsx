@@ -24,6 +24,8 @@ import { deleteCampaign, saveOptions } from "../actions";
 
 type Options = {
   daily_limit: string;
+  gap_min_minutes: string;
+  gap_max_minutes: string;
   track_opens: boolean;
   track_clicks: boolean;
   stop_on_reply: boolean;
@@ -63,6 +65,11 @@ export function OptionsForm({
       }
     });
   }
+
+  // About how many emails per hour one inbox sends with this gap.
+  const gapMin = Number(form.gap_min_minutes);
+  const gapMax = Number(form.gap_max_minutes);
+  const gapValid = Number.isInteger(gapMin) && Number.isInteger(gapMax) && gapMin >= 1 && gapMax >= gapMin;
 
   const inboxCapacity = accounts
     .filter((a) => form.email_account_ids.includes(a.id) && a.status === "active")
@@ -115,9 +122,9 @@ export function OptionsForm({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Limits</CardTitle>
+            <CardTitle className="text-base">Limits and pace</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-2">
+          <CardContent className="grid gap-4">
             <Field
               label="Max emails per day for this campaign"
               name="daily_limit"
@@ -128,6 +135,37 @@ export function OptionsForm({
               errors={fieldErrors.daily_limit}
               hint={`Each inbox also keeps its own daily limit. Chosen active inboxes can send up to ${inboxCapacity}/day in total.`}
             />
+
+            <div className="grid gap-2">
+              <p className="text-sm font-medium">Time gap between emails</p>
+              <div className="flex flex-wrap items-start gap-3">
+                <Field
+                  label="Minimum (minutes)"
+                  name="gap_min_minutes"
+                  inputMode="numeric"
+                  className="w-32"
+                  value={form.gap_min_minutes}
+                  onChange={(e) => set("gap_min_minutes", e.target.value)}
+                  errors={fieldErrors.gap_min_minutes}
+                />
+                <Field
+                  label="Maximum (minutes)"
+                  name="gap_max_minutes"
+                  inputMode="numeric"
+                  className="w-32"
+                  value={form.gap_max_minutes}
+                  onChange={(e) => set("gap_max_minutes", e.target.value)}
+                  errors={fieldErrors.gap_max_minutes}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                After an inbox sends an email, it waits a random time between these two values before it sends the
+                next one, so sending looks natural. Each inbox waits on its own.{" "}
+                {gapValid &&
+                  `With ${gapMin}–${gapMax} minutes, one inbox sends about ${Math.max(1, Math.floor(60 / gapMax))}–${Math.max(1, Math.floor(60 / gapMin))} emails per hour (and never more than its daily limit). `}
+                The shortest gap is 1 minute, because sending is checked once a minute.
+              </p>
+            </div>
           </CardContent>
         </Card>
 

@@ -58,7 +58,7 @@ export async function createCampaign(input: { name?: string; timezone?: string }
   // Start with one empty step so the editor has something to show.
   const { error: stepError } = await supabase.rpc("save_sequence", {
     p_campaign_id: campaign.id,
-    p_steps: [{ delay_days: 0, subject: "", body: "" }],
+    p_steps: [{ delay_days: 0, delay_hours: 0, subject: "", body: "" }],
   });
   if (stepError) logger.error("create first step failed", { error: stepError, campaignId: campaign.id });
 

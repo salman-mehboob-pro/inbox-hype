@@ -1,3 +1,5 @@
+import { splitQuotedText } from "./quote";
+
 // Reading incoming mail (pure, no I/O): is it a real reply, an automatic
 // reply (out of office) or a bounce report, and which of our emails is it about?
 
@@ -136,11 +138,11 @@ export function classifyInbound(input: InboundInput): InboundClass {
 // The visible start of a message: first lines of the text, quotes removed.
 export function snippet(text: string | null | undefined, max = 140): string {
   if (!text) return "";
-  const lines = text
-    .split(/\r?\n/)
+  // The new text only: older quoted messages are cut off (see quote.ts).
+  const body = splitQuotedText(text)
+    .main.split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith(">"));
-  const cut = lines.findIndex((l) => /^on .+ wrote:$/i.test(l) || /^-{2,}\s*original message/i.test(l));
-  const body = (cut === -1 ? lines : lines.slice(0, cut)).join(" ");
+    .filter(Boolean)
+    .join(" ");
   return body.length > max ? `${body.slice(0, max - 1)}…` : body;
 }

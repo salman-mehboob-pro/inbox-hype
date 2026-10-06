@@ -33,8 +33,6 @@ type FormState = {
   imapUsername: string;
   imapPassword: string;
   dailyLimit: string;
-  minDelaySeconds: string;
-  maxDelaySeconds: string;
 };
 
 function stateForProvider(provider: Provider, prev?: FormState): FormState {
@@ -55,8 +53,6 @@ function stateForProvider(provider: Provider, prev?: FormState): FormState {
     imapUsername: "",
     imapPassword: "",
     dailyLimit: String(p.recommendedDailyLimit),
-    minDelaySeconds: prev?.minDelaySeconds ?? "60",
-    maxDelaySeconds: prev?.maxDelaySeconds ?? "180",
   };
 }
 
@@ -250,10 +246,13 @@ export function NewAccountForm() {
           <CardTitle>Sending limits</CardTitle>
           <CardDescription>Keep it low for cold email. 30–50 a day per inbox is safe.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
-          <Field label="Emails per day" inputMode="numeric" {...bind("dailyLimit")} />
-          <Field label="Min gap (seconds)" inputMode="numeric" {...bind("minDelaySeconds")} />
-          <Field label="Max gap (seconds)" inputMode="numeric" {...bind("maxDelaySeconds")} />
+        <CardContent className="grid gap-4 sm:max-w-xs">
+          <Field
+            label="Emails per day"
+            inputMode="numeric"
+            hint="The time gap between emails is set per campaign (campaign → Options)."
+            {...bind("dailyLimit")}
+          />
         </CardContent>
       </Card>
 

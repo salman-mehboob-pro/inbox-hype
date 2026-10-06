@@ -43,8 +43,6 @@ export function TestButton({ id }: { id: string }) {
 type Settings = {
   fromName: string;
   dailyLimit: string;
-  minDelaySeconds: string;
-  maxDelaySeconds: string;
   signature: string;
 };
 
@@ -83,10 +81,13 @@ export function SettingsForm({ id, initial }: { id: string; initial: Settings })
           }}
         >
           <Field label="From name" placeholder="e.g. Sarah from Buildberg" {...bind("fromName")} />
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Emails per day" inputMode="numeric" {...bind("dailyLimit")} />
-            <Field label="Min gap (seconds)" inputMode="numeric" {...bind("minDelaySeconds")} />
-            <Field label="Max gap (seconds)" inputMode="numeric" {...bind("maxDelaySeconds")} />
+          <div className="grid gap-4 sm:max-w-xs">
+            <Field
+              label="Emails per day"
+              inputMode="numeric"
+              hint="The time gap between emails is set per campaign (campaign → Options)."
+              {...bind("dailyLimit")}
+            />
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="signature">Signature</Label>

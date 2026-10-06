@@ -6,6 +6,7 @@ export const MAX_STEPS = 20;
 export const stepSchema = z.object({
   id: z.uuid().optional(),
   delay_days: z.coerce.number().int().min(0, "0 or more").max(365, "Max 365 days"),
+  delay_hours: z.coerce.number().int().min(0, "0 or more").max(23, "Max 23 hours"),
   subject: z.string().max(500, "Subject is too long (max 500)"),
   body: z.string().max(200_000, "Email is too long (max 200,000 characters of HTML)"),
   body_format: z.enum(["rich", "html"]).default("rich"),
@@ -35,14 +36,22 @@ export const scheduleSchema = z
 
 export type ScheduleInput = z.input<typeof scheduleSchema>;
 
-export const optionsSchema = z.object({
-  daily_limit: z.coerce.number().int().min(1, "At least 1").max(10000, "Max 10,000"),
-  track_opens: z.boolean(),
-  track_clicks: z.boolean(),
-  stop_on_reply: z.boolean(),
-  include_unsubscribe: z.boolean(),
-  email_account_ids: z.array(z.uuid()).max(100),
-});
+export const optionsSchema = z
+  .object({
+    daily_limit: z.coerce.number().int().min(1, "At least 1").max(10000, "Max 10,000"),
+    // The random pause between two emails from the same inbox, in minutes.
+    gap_min_minutes: z.coerce.number().int().min(1, "At least 1 minute").max(1440, "Max 1440 (one day)"),
+    gap_max_minutes: z.coerce.number().int().min(1, "At least 1 minute").max(1440, "Max 1440 (one day)"),
+    track_opens: z.boolean(),
+    track_clicks: z.boolean(),
+    stop_on_reply: z.boolean(),
+    include_unsubscribe: z.boolean(),
+    email_account_ids: z.array(z.uuid()).max(100),
+  })
+  .refine((v) => v.gap_max_minutes >= v.gap_min_minutes, {
+    message: "The maximum must be at least the minimum",
+    path: ["gap_max_minutes"],
+  });
 
 export type OptionsInput = z.input<typeof optionsSchema>;
 

@@ -134,6 +134,8 @@ export type Database = {
         Row: {
           created_at: string
           daily_limit: number
+          gap_max_minutes: number
+          gap_min_minutes: number
           id: string
           include_unsubscribe: boolean
           name: string
@@ -153,6 +155,8 @@ export type Database = {
         Insert: {
           created_at?: string
           daily_limit?: number
+          gap_max_minutes?: number
+          gap_min_minutes?: number
           id?: string
           include_unsubscribe?: boolean
           name: string
@@ -172,6 +176,8 @@ export type Database = {
         Update: {
           created_at?: string
           daily_limit?: number
+          gap_max_minutes?: number
+          gap_min_minutes?: number
           id?: string
           include_unsubscribe?: boolean
           name?: string
@@ -680,6 +686,7 @@ export type Database = {
           campaign_id: string
           created_at: string
           delay_days: number
+          delay_hours: number
           id: string
           position: number
           subject: string
@@ -692,6 +699,7 @@ export type Database = {
           campaign_id: string
           created_at?: string
           delay_days?: number
+          delay_hours?: number
           id?: string
           position: number
           subject?: string
@@ -704,6 +712,7 @@ export type Database = {
           campaign_id?: string
           created_at?: string
           delay_days?: number
+          delay_hours?: number
           id?: string
           position?: number
           subject?: string
