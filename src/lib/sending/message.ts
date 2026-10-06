@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { convert } from "html-to-text";
 import { escapeHtml, looksLikeHtml, render, textToHtml, type TemplateLead } from "@/lib/email/template";
+import { addOpenPixel, openPixelUrl, rewriteLinks, trackedLinkUrl } from "./tracking";
 
 // Builds the email that one lead receives (pure, no I/O).
 //   subject + body -> variables + spin text -> safe HTML + plain-text part.
@@ -172,6 +173,15 @@ export type BuildMessageInput = {
   threadSubject?: string | null;
   // Unsubscribe link for the footer; null = no footer.
   unsubscribeUrl?: string | null;
+  // Open / click tracking (campaign options). null = off.
+  tracking?: {
+    appUrl: string;
+    sentMessageId: string;
+    opens: boolean;
+    clicks: boolean;
+    // Signs a link so the click route accepts it (see tracking.ts).
+    sign: (url: string) => string;
+  } | null;
 };
 
 export type BuiltMessage = {
@@ -209,32 +219,51 @@ export function buildMessage(input: BuildMessageInput): BuiltMessage {
   const source = step.body_format === "html" || looksLikeHtml(step.body) ? step.body : textToHtml(step.body);
   const renderedBody = render(source, lead, sender, `${seed}:body`, { html: true });
   renderedBody.missing.forEach((m) => missing.add(m));
-  let html = sanitizeEmailHtml(renderedBody.text);
+  const body = sanitizeEmailHtml(renderedBody.text);
 
-  // Signature: plain text typed in the inbox settings (may use variables).
+  // Everything after the body: signature (plain text typed in the inbox settings,
+  // may use variables) and the unsubscribe footer.
+  let tail = "";
   if (account.signature.trim()) {
     const sig = render(account.signature, lead, sender, `${seed}:signature`);
     sig.missing.forEach((m) => missing.add(m));
     const sigHtml = escapeHtml(sig.text.trim()).replace(/\r?\n/g, "<br>");
-    html = appendHtml(html, `<div style="margin-top:16px">${sigHtml}</div>`);
+    tail += `<div style="margin-top:16px">${sigHtml}</div>`;
   }
-
   if (input.unsubscribeUrl) {
     const url = quote(input.unsubscribeUrl);
-    html = appendHtml(
-      html,
-      `<p style="margin-top:24px;font-size:12px;color:#6b7280">Not interested? <a href="${url}">Unsubscribe</a></p>`,
-    );
+    tail += `<p style="margin-top:24px;font-size:12px;color:#6b7280">Not interested? <a href="${url}">Unsubscribe</a></p>`;
   }
 
-  if (!/<html[\s>]/i.test(html)) {
-    html = `<!doctype html><html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+  const assemble = (bodyHtml: string) => {
+    const withTail = appendHtml(bodyHtml, tail);
+    return /<html[\s>]/i.test(withTail)
+      ? withTail
+      : `<!doctype html><html><head><meta charset="utf-8"></head><body>${withTail}</body></html>`;
+  };
+
+  // The plain-text part keeps the real links (it is not tracked).
+  const text = htmlToPlainText(assemble(body));
+
+  // The HTML part: links go through our click route when "track clicks" is on
+  // (the unsubscribe link is added after, so it is never rewritten), and a 1x1
+  // image is added when "track opens" is on.
+  const tracking = input.tracking;
+  let trackedBody = body;
+  if (tracking?.clicks) {
+    trackedBody = rewriteLinks(body, (url) =>
+      url.startsWith(tracking.appUrl.replace(/\/+$/, "") + "/")
+        ? null
+        : trackedLinkUrl(tracking.appUrl, tracking.sentMessageId, url, tracking.sign(url)),
+    );
   }
+  let html = assemble(trackedBody);
+  if (tracking?.opens) html = addOpenPixel(html, openPixelUrl(tracking.appUrl, tracking.sentMessageId));
 
   return {
     subject,
     html,
-    text: htmlToPlainText(html),
+    text,
     missing: [...missing],
     inThread: replyInThread && subject !== "",
   };

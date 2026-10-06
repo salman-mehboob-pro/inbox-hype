@@ -865,6 +865,22 @@ export type Database = {
         }
         Returns: string
       }
+      record_click: {
+        Args: { p_meta?: Json; p_sent_message_id: string; p_url: string }
+        Returns: boolean
+      }
+      record_open: {
+        Args: { p_meta?: Json; p_sent_message_id: string }
+        Returns: boolean
+      }
+      unsubscribe_by_message: {
+        Args: { p_sent_message_id: string }
+        Returns: { out_email: string; out_result: string }[]
+      }
+      unsubscribe_info: {
+        Args: { p_sent_message_id: string }
+        Returns: { out_already: boolean; out_email: string; out_sender: string }[]
+      }
       sweep_stale_sends: {
         Args: { p_older_than?: string }
         Returns: number

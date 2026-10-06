@@ -1,13 +1,14 @@
 import "server-only";
 import { loadAccountConfig } from "@/lib/email/account-secrets";
 import { createSmtpTransport } from "@/lib/email/clients";
-import { publicEnv } from "@/lib/env";
+import { publicEnv, serverEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json, Tables } from "@/lib/supabase/database.types";
 import { classifySendError, InboxConfigError, type InboxEffect } from "./errors";
 import { buildMessage, makeMessageId, threadHeaders, unsubscribeUrl } from "./message";
 import { isInSendWindow, nextWindowOpen, resolveTimeZone } from "./schedule";
+import { deriveTrackingKey, oneClickUnsubscribeUrl, signClick } from "./tracking";
 
 // The sending tick. Called every minute (Supabase pg_cron -> /api/cron/tick).
 //
@@ -294,6 +295,17 @@ async function trySend(
       unsubscribeUrl: campaign.include_unsubscribe
         ? unsubscribeUrl(publicEnv.NEXT_PUBLIC_APP_URL, sentMessageId)
         : null,
+      // Open / click tracking, only when the campaign has it switched on.
+      tracking:
+        campaign.track_opens || campaign.track_clicks
+          ? {
+              appUrl: publicEnv.NEXT_PUBLIC_APP_URL,
+              sentMessageId,
+              opens: campaign.track_opens,
+              clicks: campaign.track_clicks,
+              sign: (url: string) => signClick(deriveTrackingKey(serverEnv().ENCRYPTION_KEY), sentMessageId, url),
+            }
+          : null,
     });
   } catch (error) {
     logger.error("could not build an email", { ...context, error });
@@ -385,7 +397,8 @@ async function deliver(
       ...(thread ? { inReplyTo: thread.inReplyTo, references: thread.references } : {}),
       headers: unsubscribeId
         ? {
-            "List-Unsubscribe": `<${unsubscribeUrl(publicEnv.NEXT_PUBLIC_APP_URL, unsubscribeId)}>`,
+            // The mail app POSTs to this address (one-click unsubscribe, RFC 8058).
+            "List-Unsubscribe": `<${oneClickUnsubscribeUrl(publicEnv.NEXT_PUBLIC_APP_URL, unsubscribeId)}>`,
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
           }
         : {},

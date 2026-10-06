@@ -212,3 +212,55 @@ describe("makeMessageId", () => {
     expect(makeMessageId("me@sender.test")).not.toBe(a);
   });
 });
+
+describe("tracking", () => {
+  const ID = "3f2a1c9e-1111-4222-8333-444455556666";
+  const tracking = (opens: boolean, clicks: boolean) => ({
+    appUrl: "https://app.test",
+    sentMessageId: ID,
+    opens,
+    clicks,
+    sign: (url: string) => `sig(${url.length})`,
+  });
+  const linkStep = {
+    position: 1,
+    subject: "s",
+    body: '<p>See <a href="https://acme.test/a?x=1&amp;y=2">our page</a> or <a href="mailto:hi@acme.test">write</a>.</p>',
+    body_format: "rich",
+  };
+
+  it("does nothing when both toggles are off", () => {
+    const m = build({ step: linkStep, tracking: tracking(false, false), unsubscribeUrl: "https://app.test/u/1" });
+    expect(m.html).not.toContain("/c/");
+    expect(m.html).not.toContain("/o/");
+    expect(m.html).toContain('href="https://acme.test/a?x=1&amp;y=2"');
+  });
+
+  it("click tracking sends web links through our route, but not mailto or the unsubscribe link", () => {
+    const m = build({ step: linkStep, tracking: tracking(false, true), unsubscribeUrl: "https://app.test/u/1" });
+    expect(m.html).toContain(`href="https://app.test/c/${ID}?u=https%3A%2F%2Facme.test%2Fa%3Fx%3D1%26y%3D2&amp;s=sig(`);
+    expect(m.html).toContain('href="mailto:hi@acme.test"');
+    expect(m.html).toContain('<a href="https://app.test/u/1">Unsubscribe</a>');
+    expect(m.html).not.toContain("/o/");
+  });
+
+  it("the plain-text part keeps the real links", () => {
+    const m = build({ step: linkStep, tracking: tracking(true, true) });
+    expect(m.text).toContain("https://acme.test/a?x=1&y=2");
+    expect(m.text).not.toContain("/c/");
+    expect(m.text).not.toContain("/o/");
+  });
+
+  it("open tracking adds one 1x1 image and nothing else", () => {
+    const m = build({ step: linkStep, tracking: tracking(true, false) });
+    expect(m.html.match(/<img /g)).toHaveLength(1);
+    expect(m.html).toContain(`src="https://app.test/o/${ID}.png"`);
+    expect(m.html).toContain('href="https://acme.test/a?x=1&amp;y=2"');
+  });
+
+  it("does not rewrite a link that already points at our own app", () => {
+    const own = { ...linkStep, body: '<p><a href="https://app.test/pricing">us</a></p>' };
+    const m = build({ step: own, tracking: tracking(false, true) });
+    expect(m.html).toContain('href="https://app.test/pricing"');
+  });
+});
