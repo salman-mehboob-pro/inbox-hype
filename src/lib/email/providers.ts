@@ -47,13 +47,15 @@ export const PROVIDER_PRESETS: Record<Provider, ProviderPreset> = {
     recommendedDailyLimit: 30,
     help: "Use an app-specific password. IMAP must be enabled in Zoho Mail settings. EU accounts use smtp.zoho.eu / imap.zoho.eu.",
   },
+  // Sends through the Postal HTTP API (not SMTP). Replies come back through a
+  // Postal route, set up on the inbox page after connecting.
   postal: {
-    label: "Postal (custom SMTP)",
+    label: "Postal (API)",
     smtp: null,
     imap: null,
     supportsImap: false,
-    recommendedDailyLimit: 50,
-    help: "Use your Postal server's SMTP host and an SMTP credential. Postal can't read replies, so replies go to the From inbox.",
+    recommendedDailyLimit: 30,
+    help: "Use your Postal address and the key of an API credential (Postal → your mail server → Credentials → type API). After saving, the inbox page shows a one-time setup for replies and bounces.",
   },
   custom: {
     label: "Other (custom SMTP / IMAP)",

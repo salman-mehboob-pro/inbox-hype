@@ -253,12 +253,13 @@ export type Database = {
           max_delay_seconds: number
           min_delay_seconds: number
           next_available_at: string | null
+          postal_server_id: string | null
           provider: string
           signature: string
-          smtp_host: string
-          smtp_port: number
+          smtp_host: string | null
+          smtp_port: number | null
           smtp_secure: boolean
-          smtp_username: string
+          smtp_username: string | null
           status: string
           updated_at: string
           workspace_id: string
@@ -282,12 +283,13 @@ export type Database = {
           max_delay_seconds?: number
           min_delay_seconds?: number
           next_available_at?: string | null
+          postal_server_id?: string | null
           provider?: string
           signature?: string
-          smtp_host: string
-          smtp_port: number
+          smtp_host?: string | null
+          smtp_port?: number | null
           smtp_secure?: boolean
-          smtp_username: string
+          smtp_username?: string | null
           status?: string
           updated_at?: string
           workspace_id: string
@@ -311,17 +313,25 @@ export type Database = {
           max_delay_seconds?: number
           min_delay_seconds?: number
           next_available_at?: string | null
+          postal_server_id?: string | null
           provider?: string
           signature?: string
-          smtp_host?: string
-          smtp_port?: number
+          smtp_host?: string | null
+          smtp_port?: number | null
           smtp_secure?: boolean
-          smtp_username?: string
+          smtp_username?: string | null
           status?: string
           updated_at?: string
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "email_accounts_postal_server_fkey"
+            columns: ["postal_server_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "postal_servers"
+            referencedColumns: ["id", "workspace_id"]
+          },
           {
             foreignKeyName: "email_accounts_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -571,6 +581,65 @@ export type Database = {
           },
         ]
       }
+      postal_servers: {
+        Row: {
+          api_url: string
+          check_message_id: string | null
+          check_sent_at: string | null
+          created_at: string
+          hook_token: string
+          id: string
+          last_inbound_at: string | null
+          last_webhook_at: string | null
+          route_ok_at: string | null
+          updated_at: string
+          warning: string | null
+          warning_at: string | null
+          webhook_ok_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          api_url: string
+          check_message_id?: string | null
+          check_sent_at?: string | null
+          created_at?: string
+          hook_token: string
+          id?: string
+          last_inbound_at?: string | null
+          last_webhook_at?: string | null
+          route_ok_at?: string | null
+          updated_at?: string
+          warning?: string | null
+          warning_at?: string | null
+          webhook_ok_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          api_url?: string
+          check_message_id?: string | null
+          check_sent_at?: string | null
+          created_at?: string
+          hook_token?: string
+          id?: string
+          last_inbound_at?: string | null
+          last_webhook_at?: string | null
+          route_ok_at?: string | null
+          updated_at?: string
+          warning?: string | null
+          warning_at?: string | null
+          webhook_ok_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "postal_servers_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sent_messages: {
         Row: {
           body_html: string | null
@@ -580,6 +649,9 @@ export type Database = {
           click_count: number
           clicked_at: string | null
           created_at: string
+          delivered_at: string | null
+          delivery_detail: string | null
+          delivery_status: string | null
           email_account_id: string | null
           error: string | null
           id: string
@@ -588,6 +660,7 @@ export type Database = {
           message_id: string
           open_count: number
           opened_at: string | null
+          provider_message_id: string | null
           replied_at: string | null
           sent_at: string | null
           sequence_step_id: string
@@ -605,6 +678,9 @@ export type Database = {
           click_count?: number
           clicked_at?: string | null
           created_at?: string
+          delivered_at?: string | null
+          delivery_detail?: string | null
+          delivery_status?: string | null
           email_account_id?: string | null
           error?: string | null
           id?: string
@@ -613,6 +689,7 @@ export type Database = {
           message_id: string
           open_count?: number
           opened_at?: string | null
+          provider_message_id?: string | null
           replied_at?: string | null
           sent_at?: string | null
           sequence_step_id: string
@@ -630,6 +707,9 @@ export type Database = {
           click_count?: number
           clicked_at?: string | null
           created_at?: string
+          delivered_at?: string | null
+          delivery_detail?: string | null
+          delivery_status?: string | null
           email_account_id?: string | null
           error?: string | null
           id?: string
@@ -638,6 +718,7 @@ export type Database = {
           message_id?: string
           open_count?: number
           opened_at?: string | null
+          provider_message_id?: string | null
           replied_at?: string | null
           sent_at?: string | null
           sequence_step_id?: string

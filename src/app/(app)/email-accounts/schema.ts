@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PROVIDERS } from "@/lib/email/providers";
+import { normalizePostalUrl } from "@/lib/postal/core";
 
 const hostname = z
   .string()
@@ -48,6 +49,26 @@ export const createAccountSchema = z
   });
 
 export type CreateAccountInput = z.input<typeof createAccountSchema>;
+
+// Postal: sends through the Postal HTTP API (no SMTP / IMAP settings).
+export const createPostalAccountSchema = z.object({
+  email: z.email("Enter a valid email").trim().toLowerCase(),
+  apiUrl: z
+    .string()
+    .max(300)
+    .transform((value, ctx) => {
+      const url = normalizePostalUrl(value);
+      if (!url) {
+        ctx.addIssue({ code: "custom", message: "Enter your Postal address, like https://postal.example.com" });
+        return z.NEVER;
+      }
+      return url;
+    }),
+  apiKey: z.string().trim().min(1, "Required").max(200),
+  ...sendingSettings,
+});
+
+export type CreatePostalAccountInput = z.input<typeof createPostalAccountSchema>;
 
 export const settingsSchema = z.object({
   ...sendingSettings,

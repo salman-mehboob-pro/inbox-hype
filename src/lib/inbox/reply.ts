@@ -1,6 +1,5 @@
 import "server-only";
-import { loadAccountConfig } from "@/lib/email/account-secrets";
-import { createSmtpTransport } from "@/lib/email/clients";
+import { sendFromInbox } from "@/lib/email/send";
 import { escapeHtml, textToHtml } from "@/lib/email/template";
 import { classifySendError } from "@/lib/sending/errors";
 import { makeMessageId, reSubject } from "@/lib/sending/message";
@@ -34,23 +33,15 @@ export async function sendManualReply(args: {
   const messageId = makeMessageId(inbox.email);
 
   try {
-    const config = await loadAccountConfig(inbox);
-    const transport = await createSmtpTransport(config.smtp);
-    try {
-      await transport.sendMail({
-        from: inbox.from_name ? { name: inbox.from_name, address: inbox.email } : inbox.email,
-        to: original.from_email,
-        envelope: { from: inbox.email, to: original.from_email },
-        subject,
-        text: plain,
-        html,
-        messageId,
-        inReplyTo: original.message_id,
-        references,
-      });
-    } finally {
-      transport.close();
-    }
+    await sendFromInbox(inbox, {
+      to: original.from_email,
+      subject,
+      text: plain,
+      html,
+      messageId,
+      inReplyTo: original.message_id,
+      references,
+    });
   } catch (error) {
     return { ok: false, error: classifySendError(error).message };
   }

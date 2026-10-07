@@ -126,10 +126,10 @@ export function PasswordForm({ id, hasImap, provider }: { id: string; hasImap: b
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Update password</CardTitle>
+        <CardTitle>{provider === "postal" ? "Update API key" : "Update password"}</CardTitle>
         <CardDescription>
-          Use this if you made a new {provider === "postal" ? "SMTP credential" : "app password"}. We test it before
-          saving.
+          Use this if you made a new {provider === "postal" ? "Postal API credential" : "app password"}. We test it
+          before saving.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -157,7 +157,7 @@ export function PasswordForm({ id, hasImap, provider }: { id: string; hasImap: b
           }}
         >
           <Field
-            label="New password"
+            label={provider === "postal" ? "New API key" : "New password"}
             name="password"
             type="password"
             autoComplete="new-password"
@@ -181,7 +181,7 @@ export function PasswordForm({ id, hasImap, provider }: { id: string; hasImap: b
           {test && <ConnectionResult test={test} />}
           <Button type="submit" className="justify-self-start" disabled={pending || !password}>
             {pending && <Loader2Icon className="animate-spin" />}
-            {pending ? "Testing…" : "Test & save password"}
+            {pending ? "Testing…" : provider === "postal" ? "Test & save API key" : "Test & save password"}
           </Button>
         </form>
       </CardContent>

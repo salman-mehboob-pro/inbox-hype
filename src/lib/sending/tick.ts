@@ -1,11 +1,10 @@
 import "server-only";
-import { loadAccountConfig } from "@/lib/email/account-secrets";
-import { createSmtpTransport } from "@/lib/email/clients";
+import { isPostalInbox, sendFromInbox } from "@/lib/email/send";
 import { publicEnv, serverEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json, Tables } from "@/lib/supabase/database.types";
-import { classifySendError, InboxConfigError, type InboxEffect } from "./errors";
+import { classifySendError, type InboxEffect } from "./errors";
 import { buildMessage, makeMessageId, threadHeaders, unsubscribeUrl } from "./message";
 import { isInSendWindow, nextWindowOpen, resolveTimeZone } from "./schedule";
 import { deriveTrackingKey, oneClickUnsubscribeUrl, signClick } from "./tracking";
@@ -19,7 +18,8 @@ import { deriveTrackingKey, oneClickUnsubscribeUrl, signClick } from "./tracking
 // ticks at the same time can never send the same email twice.
 
 type Admin = ReturnType<typeof createAdminClient>;
-type Inbox = Tables<"email_accounts">;
+// A Postal inbox brings its server's reply-route state (see repliesAreFresh).
+type Inbox = Tables<"email_accounts"> & { postal_server: { route_ok_at: string | null } | null };
 type CampaignLead = Tables<"campaign_leads"> & { lead: Tables<"leads"> | null };
 type ActiveCampaign = Tables<"campaigns"> & {
   steps: Tables<"sequence_steps">[];
@@ -95,7 +95,7 @@ export async function runTick(options: { budgetMs?: number } = {}): Promise<Tick
       .eq("status", "active"),
     admin
       .from("email_accounts")
-      .select("*")
+      .select("*, postal_server:postal_servers(route_ok_at)")
       .eq("status", "active")
       .or(`next_available_at.is.null,next_available_at.lte.${now.toISOString()}`)
       .order("last_sent_at", { ascending: true, nullsFirst: true }),
@@ -112,7 +112,7 @@ export async function runTick(options: { budgetMs?: number } = {}): Promise<Tick
   const campaigns = new Map<string, ActiveCampaign>(
     (campaignsResult.data as ActiveCampaign[]).map((c) => [c.id, c]),
   );
-  const inboxes = inboxesResult.data;
+  const inboxes = inboxesResult.data as Inbox[];
   summary.inboxes = inboxes.length;
 
   if (campaigns.size > 0 && inboxes.length > 0) {
@@ -322,7 +322,30 @@ async function trySend(
     logger.info("dry run: email not sent", { ...context, subject: message.subject, text: message.text });
   } else {
     try {
-      await deliver(inbox, lead.email, message, messageId, headers, campaign.include_unsubscribe ? sentMessageId : null);
+      const sent = await sendFromInbox(inbox, {
+        to: lead.email,
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+        messageId,
+        ...(headers ? { inReplyTo: headers.inReplyTo, references: headers.references } : {}),
+        headers: campaign.include_unsubscribe
+          ? {
+              // The mail app POSTs to this address (one-click unsubscribe, RFC 8058).
+              "List-Unsubscribe": `<${oneClickUnsubscribeUrl(publicEnv.NEXT_PUBLIC_APP_URL, sentMessageId)}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            }
+          : {},
+      });
+      // Postal's id, so its webhook can be matched to this email (best effort:
+      // the Message-ID is the main way).
+      if (sent.providerMessageId) {
+        const { error } = await admin
+          .from("sent_messages")
+          .update({ provider_message_id: sent.providerMessageId })
+          .eq("id", sentMessageId);
+        if (error) logger.warn("could not save Postal's message id", { ...context, error });
+      }
     } catch (error) {
       const failure = classifySendError(error);
       logger.warn("send failed", { ...context, mode: failure.mode, reason: failure.message });
@@ -360,52 +383,17 @@ async function trySend(
 
 const REPLIES_MAX_AGE_MS = 30 * 60 * 1000;
 
-// Inboxes without IMAP (for example Postal) can't be checked, so they are always "fresh".
+// Can we see this inbox's replies right now?
+//   - IMAP inboxes: read in the last 30 minutes.
+//   - Postal inboxes: replies are pushed to us by the Postal route, so its setup
+//     must have been confirmed ("Check setup" on the inbox page). Until then
+//     only first emails go out, never follow-ups.
+//   - Inboxes without either can't be checked, so they are always "fresh".
 function repliesAreFresh(inbox: Inbox): boolean {
+  if (isPostalInbox(inbox)) return Boolean(inbox.postal_server?.route_ok_at);
   if (!inbox.imap_host) return true;
   if (!inbox.imap_last_synced_at) return false;
   return Date.now() - new Date(inbox.imap_last_synced_at).getTime() < REPLIES_MAX_AGE_MS;
-}
-
-// SMTP ---------------------------------------------------------------------------------
-
-async function deliver(
-  inbox: Inbox,
-  to: string,
-  message: ReturnType<typeof buildMessage>,
-  messageId: string,
-  thread: { inReplyTo: string; references: string } | null,
-  unsubscribeId: string | null,
-) {
-  let config: Awaited<ReturnType<typeof loadAccountConfig>>;
-  try {
-    config = await loadAccountConfig(inbox);
-  } catch (error) {
-    logger.error("could not read an inbox's saved login", { error, inboxId: inbox.id });
-    throw new InboxConfigError("The inbox's saved password could not be read. Remove the inbox and add it again.");
-  }
-  const transport = await createSmtpTransport(config.smtp);
-  try {
-    await transport.sendMail({
-      from: inbox.from_name ? { name: inbox.from_name, address: inbox.email } : inbox.email,
-      to,
-      envelope: { from: inbox.email, to },
-      subject: message.subject,
-      html: message.html,
-      text: message.text,
-      messageId,
-      ...(thread ? { inReplyTo: thread.inReplyTo, references: thread.references } : {}),
-      headers: unsubscribeId
-        ? {
-            // The mail app POSTs to this address (one-click unsubscribe, RFC 8058).
-            "List-Unsubscribe": `<${oneClickUnsubscribeUrl(publicEnv.NEXT_PUBLIC_APP_URL, unsubscribeId)}>`,
-            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-          }
-        : {},
-    });
-  } finally {
-    transport.close();
-  }
 }
 
 // Database bookkeeping -------------------------------------------------------------

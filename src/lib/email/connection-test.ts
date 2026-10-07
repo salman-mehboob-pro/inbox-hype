@@ -1,11 +1,15 @@
 import "server-only";
 import { logger } from "@/lib/logger";
+import { postalCheckKey, type PostalConfig } from "@/lib/postal/client";
+import { friendlyPostalError } from "@/lib/postal/core";
 import { createImapClient, createSmtpTransport, type ServerConfig } from "./clients";
 import { BlockedHostError } from "./host-guard";
 
 export type CheckResult = { ok: true } | { ok: false; error: string };
 
 export type ConnectionTestResult = {
+  // How emails are sent. `smtp` holds that check's result in both cases.
+  via?: "smtp" | "postal";
   smtp: CheckResult;
   imap: CheckResult | null; // null = IMAP not used (e.g. Postal)
 };
@@ -75,6 +79,17 @@ export async function testConnection(
     imap ? testImap(imap) : Promise.resolve(null),
   ]);
   return { smtp: smtpResult, imap: imapResult };
+}
+
+// Postal: checks the URL and the API key without sending an email.
+export async function testPostal(config: PostalConfig): Promise<ConnectionTestResult> {
+  try {
+    await postalCheckKey(config);
+    return { via: "postal", smtp: { ok: true }, imap: null };
+  } catch (err) {
+    logger.warn("postal test failed", { apiUrl: config.apiUrl, error: err });
+    return { via: "postal", smtp: { ok: false, error: friendlyPostalError(err) }, imap: null };
+  }
 }
 
 export function connectionOk(result: ConnectionTestResult): boolean {

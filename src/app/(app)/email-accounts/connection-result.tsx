@@ -27,8 +27,15 @@ function Row({ label, result }: { label: string; result: CheckResult | null }) {
 export function ConnectionResult({ test }: { test: ConnectionTestResult }) {
   return (
     <ul role="status" className="grid gap-1.5 rounded-lg border bg-muted/40 p-3 text-sm">
-      <Row label="Sending (SMTP)" result={test.smtp} />
-      <Row label="Reading replies (IMAP)" result={test.imap} />
+      <Row label={test.via === "postal" ? "Sending (Postal API)" : "Sending (SMTP)"} result={test.smtp} />
+      {test.via === "postal" ? (
+        <li className="flex items-start gap-2 text-muted-foreground">
+          <MinusCircleIcon className="mt-0.5 size-4 shrink-0" />
+          <span>Replies: through the Postal route (set up on the inbox page)</span>
+        </li>
+      ) : (
+        <Row label="Reading replies (IMAP)" result={test.imap} />
+      )}
     </ul>
   );
 }

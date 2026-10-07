@@ -1,12 +1,11 @@
 import "server-only";
-import { simpleParser } from "mailparser";
 import { loadAccountConfig } from "@/lib/email/account-secrets";
 import { createImapClient } from "@/lib/email/clients";
 import { logger } from "@/lib/logger";
-import { sanitizeEmailHtml } from "@/lib/sending/message";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Json, Tables } from "@/lib/supabase/database.types";
-import { classifyInbound, extractMessageIds, isMailerDaemon, parseHeaderBlock, type InboundKind } from "./parse";
+import type { Tables } from "@/lib/supabase/database.types";
+import { ingestRawMessage } from "./ingest";
+import { extractMessageIds, isMailerDaemon, parseHeaderBlock, type InboundKind } from "./parse";
 
 // Reads replies and bounces from each inbox over IMAP.
 //
@@ -17,10 +16,6 @@ import { classifyInbound, extractMessageIds, isMailerDaemon, parseHeaderBlock, t
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Inbox = Tables<"email_accounts">;
-type SentRef = Pick<
-  Tables<"sent_messages">,
-  "id" | "message_id" | "to_email" | "status" | "created_at" | "replied_at" | "campaign_lead_id"
->;
 
 export type SyncSummary = {
   inboxes: number;
@@ -38,7 +33,6 @@ const MIN_SECONDS_BETWEEN_SYNCS = 100;
 const MAX_UIDS_PER_RUN = 300;
 const MAX_SOURCE_BYTES = 1_500_000;
 const INBOXES_AT_ONCE = 4;
-const SENT_COLUMNS = "id, message_id, to_email, status, created_at, replied_at, campaign_lead_id";
 
 export async function runInboxSync(
   options: { budgetMs?: number; force?: boolean; workspaceId?: string } = {},
@@ -279,93 +273,12 @@ async function handleMessage(
 ): Promise<InboundKind> {
   const fetched = await client.fetchOne(String(header.uid), { source: { maxLength: MAX_SOURCE_BYTES } }, { uid: true });
   if (!fetched || !fetched.source) return "other";
-  const raw = fetched.source.toString("utf8");
-  const parsed = await simpleParser(fetched.source).catch(() => null);
-  if (!parsed) return "other"; // unreadable: skip it, it would never get better
-
-  const from = parsed.from?.value?.[0];
-  const fromAddress = (from?.address ?? header.fromAddress ?? "").toLowerCase();
-  const subject = parsed.subject ?? header.subject;
-  const classified = classifyInbound({ fromAddress, subject, headers: header.fields, raw });
-  if (classified.kind === "other") return "other";
-
-  // Which of our emails is this about?
-  const ownId = parsed.messageId?.toLowerCase();
-  let ids: string[];
-  let leadEmail: string | null;
-  if (classified.kind === "bounce") {
-    ids = classified.report.originalMessageIds.filter((id) => id !== ownId);
-    leadEmail = classified.report.recipient;
-  } else {
-    ids = header.replyIds;
-    leadEmail = fromAddress || null;
-  }
-  const match = await findSentMessage(admin, inbox.id, ids, leadEmail, classified.kind === "bounce");
-  if (!match) return "other";
-
-  const references = Array.isArray(parsed.references) ? parsed.references.join(" ") : (parsed.references ?? null);
-  const message = {
-    message_id: parsed.messageId ?? `<imap-${inbox.id}-${header.uid}@inboxhype.local>`,
-    in_reply_to: parsed.inReplyTo ?? null,
-    references,
-    from_email: fromAddress || "unknown@unknown.invalid",
-    from_name: from?.name || null,
-    to_email: parsed.to ? (Array.isArray(parsed.to) ? parsed.to.map((t) => t.text).join(", ") : parsed.to.text) : inbox.email,
-    subject,
-    text_body: parsed.text ?? null,
-    html_body: typeof parsed.html === "string" ? sanitizeEmailHtml(parsed.html) : null,
-    imap_uid: header.uid,
-    received_at: (parsed.date ?? header.date ?? new Date()).toISOString(),
-  } satisfies Json;
-
-  const { data, error } = await admin.rpc("ingest_inbound", {
-    p_account_id: inbox.id,
-    p_kind: classified.kind,
-    p_sent_message_id: match.sent.id,
-    p_match_method: match.method,
-    p_message: message,
+  return ingestRawMessage(admin, {
+    accountIds: [inbox.id],
+    raw: fetched.source,
+    fallbackMessageId: `<imap-${inbox.id}-${header.uid}@inboxhype.local>`,
+    defaultTo: inbox.email,
+    imapUid: header.uid,
+    source: "imap",
   });
-  if (error) throw error;
-  if (data === "duplicate" || data === "no_match") return "other";
-  return classified.kind;
-}
-
-// The sent email an inbound message belongs to.
-//   1. By message id (our id in In-Reply-To / References, or quoted in a bounce).
-//   2. Otherwise by the lead's address: its most recent email from this inbox.
-//      Needed because Gmail may replace our Message-ID with its own.
-async function findSentMessage(
-  admin: Admin,
-  inboxId: string,
-  ids: string[],
-  leadEmail: string | null,
-  isBounce: boolean,
-): Promise<{ sent: SentRef; method: "header" | "sender" | "bounce" } | null> {
-  if (ids.length > 0) {
-    const { data, error } = await admin
-      .from("sent_messages")
-      .select(SENT_COLUMNS)
-      .eq("email_account_id", inboxId)
-      .in("message_id", ids);
-    if (error) throw error;
-    // The first id in the list is the most specific (In-Reply-To comes first).
-    for (const id of ids) {
-      const hit = data.find((row) => row.message_id.toLowerCase() === id);
-      if (hit) return { sent: hit, method: isBounce ? "bounce" : "header" };
-    }
-  }
-
-  if (leadEmail) {
-    const { data, error } = await admin
-      .from("sent_messages")
-      .select(SENT_COLUMNS)
-      .eq("email_account_id", inboxId)
-      .eq("to_email", leadEmail)
-      .in("status", ["sent", "bounced"])
-      .order("created_at", { ascending: false })
-      .limit(1);
-    if (error) throw error;
-    if (data[0]) return { sent: data[0], method: isBounce ? "bounce" : "sender" };
-  }
-  return null;
 }

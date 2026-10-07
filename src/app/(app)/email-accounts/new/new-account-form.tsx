@@ -13,9 +13,9 @@ import { Switch } from "@/components/ui/switch";
 import type { ConnectionTestResult } from "@/lib/email/connection-test";
 import { PROVIDERS, PROVIDER_PRESETS, type Provider } from "@/lib/email/providers";
 import { cn } from "@/lib/utils";
-import { createEmailAccount } from "../actions";
+import { createEmailAccount, createPostalAccount } from "../actions";
 import { ConnectionResult } from "../connection-result";
-import type { CreateAccountInput } from "../schema";
+import type { CreateAccountInput, CreatePostalAccountInput } from "../schema";
 
 type FormState = {
   provider: Provider;
@@ -33,6 +33,9 @@ type FormState = {
   imapUsername: string;
   imapPassword: string;
   dailyLimit: string;
+  // Postal (API) only
+  apiUrl: string;
+  apiKey: string;
 };
 
 function stateForProvider(provider: Provider, prev?: FormState): FormState {
@@ -53,6 +56,8 @@ function stateForProvider(provider: Provider, prev?: FormState): FormState {
     imapUsername: "",
     imapPassword: "",
     dailyLimit: String(p.recommendedDailyLimit),
+    apiUrl: prev?.apiUrl ?? "",
+    apiKey: "",
   };
 }
 
@@ -71,6 +76,7 @@ export function NewAccountForm() {
   const [pending, startTransition] = useTransition();
 
   const preset = PROVIDER_PRESETS[form.provider];
+  const isPostal = form.provider === "postal";
   const needsServerFields = preset.smtp === null;
   const serverOpen = needsServerFields || showServer;
 
@@ -89,6 +95,28 @@ export function NewAccountForm() {
     setError(undefined);
     setFieldErrors({});
     setTest(undefined);
+
+    if (isPostal) {
+      const postalInput: CreatePostalAccountInput = {
+        email: form.email,
+        fromName: form.fromName,
+        apiUrl: form.apiUrl,
+        apiKey: form.apiKey,
+        dailyLimit: form.dailyLimit,
+      };
+      startTransition(async () => {
+        const result = await createPostalAccount(postalInput);
+        if (result.ok && result.id) {
+          toast.success(`${form.email} connected. Now finish the Postal setup.`);
+          router.push(`/email-accounts/${result.id}`);
+          return;
+        }
+        setFieldErrors(result.fieldErrors ?? {});
+        setTest(result.test);
+        setError(result.test ? undefined : (result.error ?? "Please fix the errors below."));
+      });
+      return;
+    }
 
     const input: CreateAccountInput = {
       ...form,
@@ -159,87 +187,110 @@ export function NewAccountForm() {
             hint="Shown as the sender name. Optional."
             {...bind("fromName")}
           />
-          <Field
-            label={form.provider === "postal" ? "SMTP password" : "App password"}
-            type="password"
-            autoComplete="new-password"
-            required
-            hint="Saved encrypted. Never shown again."
-            {...bind("password")}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Server settings</CardTitle>
-          <CardDescription>
-            {needsServerFields
-              ? "Enter your SMTP (sending) and IMAP (reading replies) details."
-              : `Filled in for ${preset.label}. Change only if needed.`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-6">
-          {!serverOpen ? (
-            <Button type="button" variant="outline" className="justify-self-start" onClick={() => setShowServer(true)}>
-              Show server settings
-            </Button>
-          ) : (
+          {isPostal ? (
             <>
-              <fieldset className="grid gap-4">
-                <legend className="mb-2 text-sm font-medium">Sending (SMTP)</legend>
-                <div className="grid gap-4 sm:grid-cols-[1fr_110px_150px]">
-                  <Field label="Host" placeholder="smtp.example.com" {...bind("smtpHost")} />
-                  <Field label="Port" inputMode="numeric" {...bind("smtpPort")} />
-                  <SecuritySelect
-                    id="smtpSecure"
-                    secure={form.smtpSecure}
-                    onChange={(secure) => set("smtpSecure", secure)}
-                  />
-                </div>
-                <Field label="Username" placeholder="Same as email address" {...bind("smtpUsername")} />
-              </fieldset>
-
-              {preset.supportsImap && (
-                <fieldset className="grid gap-4">
-                  <legend className="mb-2 flex items-center gap-2 text-sm font-medium">
-                    <Switch
-                      id="imapEnabled"
-                      aria-label="Read replies (IMAP)"
-                      checked={form.imapEnabled}
-                      onCheckedChange={(checked) => set("imapEnabled", checked)}
-                    />
-                    <Label htmlFor="imapEnabled">Read replies (IMAP)</Label>
-                  </legend>
-                  {form.imapEnabled && (
-                    <>
-                      <div className="grid gap-4 sm:grid-cols-[1fr_110px_150px]">
-                        <Field label="Host" placeholder="imap.example.com" {...bind("imapHost")} />
-                        <Field label="Port" inputMode="numeric" {...bind("imapPort")} />
-                        <SecuritySelect
-                          id="imapSecure"
-                          secure={form.imapSecure}
-                          onChange={(secure) => set("imapSecure", secure)}
-                        />
-                      </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Username" placeholder="Same as email address" {...bind("imapUsername")} />
-                        <Field
-                          label="Password"
-                          type="password"
-                          autoComplete="new-password"
-                          placeholder="Same as above"
-                          {...bind("imapPassword")}
-                        />
-                      </div>
-                    </>
-                  )}
-                </fieldset>
-              )}
+              <Field
+                label="Postal address"
+                placeholder="https://postal.example.com"
+                autoComplete="off"
+                required
+                hint="The web address of your Postal server."
+                {...bind("apiUrl")}
+              />
+              <Field
+                label="API key"
+                type="password"
+                autoComplete="new-password"
+                required
+                hint="Key of an API credential in Postal. Saved encrypted. Never shown again."
+                {...bind("apiKey")}
+              />
             </>
+          ) : (
+            <Field
+              label="App password"
+              type="password"
+              autoComplete="new-password"
+              required
+              hint="Saved encrypted. Never shown again."
+              {...bind("password")}
+            />
           )}
         </CardContent>
       </Card>
+
+      {!isPostal && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Server settings</CardTitle>
+            <CardDescription>
+              {needsServerFields
+                ? "Enter your SMTP (sending) and IMAP (reading replies) details."
+                : `Filled in for ${preset.label}. Change only if needed.`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-6">
+            {!serverOpen ? (
+              <Button type="button" variant="outline" className="justify-self-start" onClick={() => setShowServer(true)}>
+                Show server settings
+              </Button>
+            ) : (
+              <>
+                <fieldset className="grid gap-4">
+                  <legend className="mb-2 text-sm font-medium">Sending (SMTP)</legend>
+                  <div className="grid gap-4 sm:grid-cols-[1fr_110px_150px]">
+                    <Field label="Host" placeholder="smtp.example.com" {...bind("smtpHost")} />
+                    <Field label="Port" inputMode="numeric" {...bind("smtpPort")} />
+                    <SecuritySelect
+                      id="smtpSecure"
+                      secure={form.smtpSecure}
+                      onChange={(secure) => set("smtpSecure", secure)}
+                    />
+                  </div>
+                  <Field label="Username" placeholder="Same as email address" {...bind("smtpUsername")} />
+                </fieldset>
+
+                {preset.supportsImap && (
+                  <fieldset className="grid gap-4">
+                    <legend className="mb-2 flex items-center gap-2 text-sm font-medium">
+                      <Switch
+                        id="imapEnabled"
+                        aria-label="Read replies (IMAP)"
+                        checked={form.imapEnabled}
+                        onCheckedChange={(checked) => set("imapEnabled", checked)}
+                      />
+                      <Label htmlFor="imapEnabled">Read replies (IMAP)</Label>
+                    </legend>
+                    {form.imapEnabled && (
+                      <>
+                        <div className="grid gap-4 sm:grid-cols-[1fr_110px_150px]">
+                          <Field label="Host" placeholder="imap.example.com" {...bind("imapHost")} />
+                          <Field label="Port" inputMode="numeric" {...bind("imapPort")} />
+                          <SecuritySelect
+                            id="imapSecure"
+                            secure={form.imapSecure}
+                            onChange={(secure) => set("imapSecure", secure)}
+                          />
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field label="Username" placeholder="Same as email address" {...bind("imapUsername")} />
+                          <Field
+                            label="Password"
+                            type="password"
+                            autoComplete="new-password"
+                            placeholder="Same as above"
+                            {...bind("imapPassword")}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </fieldset>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

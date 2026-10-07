@@ -18,7 +18,9 @@ export default async function EmailAccountsPage() {
   const supabase = await createClient();
   const { data: accounts, error } = await supabase
     .from("email_accounts")
-    .select("id, email, from_name, provider, status, daily_limit, imap_host, last_tested_at, last_error")
+    .select(
+      "id, email, from_name, provider, status, daily_limit, imap_host, last_tested_at, last_error, postal_server:postal_servers(route_ok_at)",
+    )
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -89,7 +91,13 @@ export default async function EmailAccountsPage() {
                   </TableCell>
                   <TableCell className="hidden sm:table-cell text-right tabular-nums">{a.daily_limit}</TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {a.imap_host ? "IMAP" : "Not read"}
+                    {a.imap_host
+                      ? "IMAP"
+                      : a.provider === "postal"
+                        ? a.postal_server?.route_ok_at
+                          ? "Postal route"
+                          : "Setup needed"
+                        : "Not read"}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground">
                     {timeAgo(a.last_tested_at)}
