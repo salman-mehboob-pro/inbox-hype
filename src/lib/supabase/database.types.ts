@@ -139,6 +139,7 @@ export type Database = {
           id: string
           include_unsubscribe: boolean
           name: string
+          next_available_at: string | null
           send_days: number[]
           started_at: string | null
           status: string
@@ -160,6 +161,7 @@ export type Database = {
           id?: string
           include_unsubscribe?: boolean
           name: string
+          next_available_at?: string | null
           send_days?: number[]
           started_at?: string | null
           status?: string
@@ -181,6 +183,7 @@ export type Database = {
           id?: string
           include_unsubscribe?: boolean
           name?: string
+          next_available_at?: string | null
           send_days?: number[]
           started_at?: string | null
           status?: string

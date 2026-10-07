@@ -11,9 +11,13 @@ import { deriveTrackingKey, oneClickUnsubscribeUrl, signClick } from "./tracking
 
 // The sending tick. Called every minute (Supabase pg_cron -> /api/cron/tick).
 //
-// Each tick, every healthy inbox sends AT MOST ONE email:
-//   1. follow-ups waiting on this inbox, then
-//   2. new leads from campaigns that use this inbox.
+// Works per CAMPAIGN (like FoxReach). Each tick, every active campaign whose
+// gap is over sends AT MOST ONE email:
+//   1. a follow-up that is due (from the lead's own inbox), otherwise
+//   2. a new lead, from the campaign's inbox that sent longest ago (rotation).
+// After that email the campaign waits its random gap (gap_min..gap_max minutes,
+// set in the database by claim_send) before the next one. An inbox sends at most
+// one email per tick, even when it is used by several campaigns.
 // Every send is reserved first (claim_send, in the database), so running two
 // ticks at the same time can never send the same email twice.
 
@@ -40,18 +44,18 @@ export type TickSummary = {
   errors: number;
 };
 
-const CANDIDATES_PER_INBOX = 25;
-const INBOXES_AT_ONCE = 4;
+const CANDIDATES_PER_CAMPAIGN = 25;
+const CAMPAIGNS_AT_ONCE = 4;
 const DEFAULT_BUDGET_MS = 240_000; // the route allows 300 s
 
 const LEAD_COLUMNS = "*, lead:leads(*)";
 
 type Outcome =
   | { kind: "sent" }
-  | { kind: "failed" } // claimed, but the email did not go out (inbox's turn is used up)
-  | { kind: "skipped" } // nothing happened, try the next candidate
-  | { kind: "stop" } // this inbox can't send now
-  | { kind: "campaign_cap"; campaignId: string };
+  | { kind: "failed" } // claimed, but the email did not go out (the campaign's turn is used up)
+  | { kind: "skipped" } // nothing happened, try the next lead
+  | { kind: "stop" } // this inbox can't send now, try another inbox
+  | { kind: "campaign_done" }; // the campaign can't send now (daily limit, gap not over)
 
 // Dry run (local only): everything happens except the call to Postal, so the whole
 // flow can be checked without emailing anyone. Ignored in production.
@@ -109,20 +113,23 @@ export async function runTick(options: { budgetMs?: number } = {}): Promise<Tick
     return summary;
   }
 
-  const campaigns = new Map<string, ActiveCampaign>(
-    (campaignsResult.data as ActiveCampaign[]).map((c) => [c.id, c]),
-  );
+  const campaigns = campaignsResult.data as ActiveCampaign[];
+  // Ordered by last_sent_at (oldest first): the inbox that sent longest ago goes next.
   const inboxes = inboxesResult.data as Inbox[];
   summary.inboxes = inboxes.length;
+  const inboxById = new Map(inboxes.map((i) => [i.id, i]));
+  // Inboxes already used in this tick (one email per inbox per tick).
+  const used = new Set<string>();
 
-  if (campaigns.size > 0 && inboxes.length > 0) {
-    await runPool(inboxes, INBOXES_AT_ONCE, async (inbox) => {
+  const due = campaigns.filter((c) => !c.next_available_at || new Date(c.next_available_at) <= now);
+  if (due.length > 0 && inboxes.length > 0) {
+    await runPool(due, CAMPAIGNS_AT_ONCE, async (campaign) => {
       if (Date.now() > deadline) return; // out of time: the next tick continues
       try {
-        await runInbox(admin, inbox, campaigns, summary, dryRun);
+        await runCampaign(admin, campaign, inboxes, inboxById, used, summary, dryRun);
       } catch (error) {
         summary.errors++;
-        logger.error("tick failed for an inbox", { error, inboxId: inbox.id });
+        logger.error("tick failed for a campaign", { error, campaignId: campaign.id });
       }
     });
   }
@@ -134,65 +141,67 @@ export async function runTick(options: { budgetMs?: number } = {}): Promise<Tick
   return summary;
 }
 
-// One inbox: find its next email and send it ---------------------------------------
+// One campaign: find its next email, pick the inbox, send it -----------------------
 
-async function runInbox(
+async function runCampaign(
   admin: Admin,
-  inbox: Inbox,
-  campaigns: Map<string, ActiveCampaign>,
+  campaign: ActiveCampaign,
+  inboxes: Inbox[],
+  inboxById: Map<string, Inbox>,
+  used: Set<string>,
   summary: TickSummary,
   dryRun: boolean,
 ) {
   const nowIso = new Date().toISOString();
-  const activeIds = [...campaigns.keys()];
-  const usingInbox = [...campaigns.values()]
-    .filter((c) => c.inboxes.some((i) => i.email_account_id === inbox.id))
-    .map((c) => c.id);
+  const campaignInboxIds = new Set(campaign.inboxes.map((i) => i.email_account_id));
+  // The campaign's inboxes that can send now, in rotation order.
+  const rotation = inboxes.filter((i) => campaignInboxIds.has(i.id));
+  const followUpInboxIds = inboxes.filter((i) => repliesAreFresh(i)).map((i) => i.id);
 
-  // Follow-ups that belong to this inbox come first, then brand-new leads.
+  // Follow-ups that are due come first, then brand-new leads.
   const [followUps, fresh] = await Promise.all([
-    admin
-      .from("campaign_leads")
-      .select(LEAD_COLUMNS)
-      .eq("email_account_id", inbox.id)
-      .eq("status", "in_progress")
-      .in("campaign_id", activeIds)
-      .lte("next_send_at", nowIso)
-      .order("next_send_at", { ascending: true })
-      .limit(CANDIDATES_PER_INBOX),
-    usingInbox.length
+    followUpInboxIds.length
       ? admin
           .from("campaign_leads")
           .select(LEAD_COLUMNS)
+          .eq("campaign_id", campaign.id)
+          .eq("status", "in_progress")
+          .in("email_account_id", followUpInboxIds)
+          .lte("next_send_at", nowIso)
+          .order("next_send_at", { ascending: true })
+          .limit(CANDIDATES_PER_CAMPAIGN)
+      : Promise.resolve({ data: [], error: null }),
+    rotation.length
+      ? admin
+          .from("campaign_leads")
+          .select(LEAD_COLUMNS)
+          .eq("campaign_id", campaign.id)
           .is("email_account_id", null)
           .in("status", ["queued", "in_progress"])
-          .in("campaign_id", usingInbox)
           .or(`next_send_at.is.null,next_send_at.lte.${nowIso}`)
           .order("created_at", { ascending: true })
-          .limit(CANDIDATES_PER_INBOX)
+          .limit(CANDIDATES_PER_CAMPAIGN)
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (followUps.error || fresh.error) {
     throw followUps.error ?? fresh.error;
   }
 
-  // Follow-ups only go out while we can see replies (new leads are not affected).
-  const followUpCandidates = repliesAreFresh(inbox) ? (followUps.data as CampaignLead[]) : [];
-  const candidates = [...followUpCandidates, ...(fresh.data as CampaignLead[])];
-  const cappedCampaigns = new Set<string>();
-
+  const candidates = [...(followUps.data as CampaignLead[]), ...(fresh.data as CampaignLead[])];
   for (const candidate of candidates) {
-    if (cappedCampaigns.has(candidate.campaign_id)) continue;
-    const campaign = campaigns.get(candidate.campaign_id);
-    if (!campaign) continue;
+    // A follow-up always goes from the lead's own inbox (same thread, same sender).
+    const own = candidate.email_account_id ? inboxById.get(candidate.email_account_id) : undefined;
+    const choices = candidate.email_account_id ? (own ? [own] : []) : rotation;
 
-    const outcome = await trySend(admin, inbox, campaign, candidate, summary, dryRun);
-    if (outcome.kind === "campaign_cap") {
-      cappedCampaigns.add(outcome.campaignId);
-      continue;
+    for (const inbox of choices) {
+      if (used.has(inbox.id)) continue;
+      used.add(inbox.id); // taken before the await, so a parallel campaign can't pick it
+      const outcome = await trySend(admin, inbox, campaign, candidate, summary, dryRun);
+      if (outcome.kind === "sent" || outcome.kind === "failed" || outcome.kind === "campaign_done") return;
+      if (outcome.kind === "stop") continue; // this inbox can't send: keep it marked, try the next one
+      used.delete(inbox.id); // "skipped": the lead was not due, the inbox is still free
+      break; // next lead
     }
-    if (outcome.kind === "skipped") continue;
-    return; // sent, failed or "stop": this inbox is done for this tick
   }
 }
 
@@ -273,8 +282,10 @@ async function trySend(
     case "inbox_cap":
       return { kind: "stop" };
     case "campaign_cap":
-      return { kind: "campaign_cap", campaignId: campaign.id };
-    default: // lead_busy, not_due, already_sent, suppressed, campaign_inactive
+    case "campaign_wait":
+    case "campaign_inactive":
+      return { kind: "campaign_done" };
+    default: // lead_busy, not_due, already_sent, suppressed
       return { kind: "skipped" };
   }
   if (!sentMessageId) return { kind: "skipped" };

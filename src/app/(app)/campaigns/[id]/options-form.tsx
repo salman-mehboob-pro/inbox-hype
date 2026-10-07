@@ -66,7 +66,7 @@ export function OptionsForm({
     });
   }
 
-  // About how many emails per hour one inbox sends with this gap.
+  // About how many emails per hour the campaign sends with this gap.
   const gapMin = Number(form.gap_min_minutes);
   const gapMax = Number(form.gap_max_minutes);
   const gapValid = Number.isInteger(gapMin) && Number.isInteger(gapMax) && gapMin >= 1 && gapMax >= gapMin;
@@ -82,8 +82,8 @@ export function OptionsForm({
           <CardHeader>
             <CardTitle className="text-base">Send from these inboxes</CardTitle>
             <CardDescription>
-              Leads are spread across the inboxes (inbox rotation). Each lead stays on one inbox, so follow-ups come
-              from the same address.
+              The inboxes take turns (inbox rotation): one email, then the next email from the next inbox. Each lead
+              stays on one inbox, so follow-ups come from the same address.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2">
@@ -159,10 +159,10 @@ export function OptionsForm({
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                After an inbox sends an email, it waits a random time between these two values before it sends the
-                next one, so sending looks natural. Each inbox waits on its own.{" "}
+                After each email, this campaign waits a random time between these two values before it sends the
+                next one, from the next inbox in turn. Its inboxes never send at the same time.{" "}
                 {gapValid &&
-                  `With ${gapMin}–${gapMax} minutes, one inbox sends about ${Math.max(1, Math.floor(60 / gapMax))}–${Math.max(1, Math.floor(60 / gapMin))} emails per hour (and never more than its daily limit). `}
+                  `With ${gapMin}–${gapMax} minutes, the campaign sends about ${Math.max(1, Math.floor(60 / gapMax))}–${Math.max(1, Math.floor(60 / gapMin))} emails per hour in total (and never more than the daily limits). `}
                 The shortest gap is 1 minute, because sending is checked once a minute.
               </p>
             </div>
