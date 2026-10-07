@@ -152,7 +152,7 @@ export async function createPostalAccount(input: unknown): Promise<ActionResult>
     .maybeSingle();
   if (existing) return { ok: false, fieldErrors: { email: ["This inbox is already connected."] } };
 
-  const test = await testPostal({ apiUrl: v.apiUrl, apiKey: v.apiKey });
+  const test = await testPostal({ apiUrl: v.apiUrl, apiKey: v.apiKey }, v.email);
   if (!connectionOk(test)) return { ok: false, test, error: connectionError(test) ?? undefined };
 
   let serverId: string;
@@ -222,7 +222,7 @@ export async function testEmailAccount(id: string): Promise<ActionResult> {
   let test: ConnectionTestResult;
   try {
     if (isPostalInbox(account)) {
-      test = await testPostal(await loadPostalConfig(account));
+      test = await testPostal(await loadPostalConfig(account), account.email);
     } else {
       const config = await loadAccountConfig(account);
       test = await testConnection(config.smtp, config.imap);
@@ -351,7 +351,7 @@ async function updatePostalKey(account: Tables<"email_accounts">, apiKey: string
       if (error) throw error;
       return { apiUrl: data.api_url };
     });
-    test = await testPostal({ apiUrl, apiKey: apiKey.trim() });
+    test = await testPostal({ apiUrl, apiKey: apiKey.trim() }, account.email);
     if (!connectionOk(test)) return { ok: false, test, error: connectionError(test) ?? undefined };
     await savePostalKey(account.id, apiKey.trim());
   } catch (error) {

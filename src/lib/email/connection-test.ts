@@ -1,6 +1,6 @@
 import "server-only";
 import { logger } from "@/lib/logger";
-import { postalCheckKey, type PostalConfig } from "@/lib/postal/client";
+import { postalCheckSender, type PostalConfig } from "@/lib/postal/client";
 import { friendlyPostalError } from "@/lib/postal/core";
 import { createImapClient, createSmtpTransport, type ServerConfig } from "./clients";
 import { BlockedHostError } from "./host-guard";
@@ -81,10 +81,11 @@ export async function testConnection(
   return { smtp: smtpResult, imap: imapResult };
 }
 
-// Postal: checks the URL and the API key without sending an email.
-export async function testPostal(config: PostalConfig): Promise<ConnectionTestResult> {
+// Postal: checks the URL, the API key and that Postal may send from this
+// address (its domain is set up in Postal), without sending an email.
+export async function testPostal(config: PostalConfig, fromEmail: string): Promise<ConnectionTestResult> {
   try {
-    await postalCheckKey(config);
+    await postalCheckSender(config, fromEmail);
     return { via: "postal", smtp: { ok: true }, imap: null };
   } catch (err) {
     logger.warn("postal test failed", { apiUrl: config.apiUrl, error: err });

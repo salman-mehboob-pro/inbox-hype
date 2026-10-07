@@ -122,6 +122,9 @@ export function friendlyPostalError(err: unknown): string {
       return "Postal: the API key was not accepted. Copy the key of an API credential (Postal → Credentials).";
     }
     if (err.code === "ServerSuspended") return "Postal: this mail server is suspended in Postal.";
+    if (err.code === "UnauthenticatedFromAddress") {
+      return "Postal: this email's domain is not set up on this Postal server. Add and verify the domain in Postal (Domains) first, or use an address on a verified domain.";
+    }
     if (err.phase === "connect") return `Postal: could not reach the server. Check the URL. (${err.message})`;
     if (err.httpStatus === 404) return "Postal: no Postal API at this address. Check the URL (for example https://postal.example.com).";
     return `Postal: ${err.message}`;

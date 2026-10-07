@@ -94,14 +94,18 @@ export async function postalSendRaw(
   return readSendResult(data, args.rcptTo);
 }
 
-// Checks the URL and the API key WITHOUT sending anything: asks for a message
-// that does not exist. A valid key gets "MessageNotFound"; a wrong key gets
-// "InvalidServerAPIKey".
-export async function postalCheckKey(config: PostalConfig): Promise<void> {
-  try {
-    await postalRequest(config, "/api/v1/messages/message", { id: 0 });
-  } catch (error) {
-    if (error instanceof PostalApiError && error.code === "MessageNotFound") return;
-    throw error;
+// Checks the URL, the API key AND that Postal may send from this address,
+// WITHOUT sending anything: a raw message with zero recipients. Postal checks
+// the key ("InvalidServerAPIKey") and the From domain ("UnauthenticatedFromAddress")
+// first, then queues one copy per recipient, so nothing goes out.
+export async function postalCheckSender(config: PostalConfig, fromEmail: string): Promise<void> {
+  const raw = `From: ${fromEmail}\r\nTo: ${fromEmail}\r\nSubject: InboxHype connection check\r\n\r\nNot sent.\r\n`;
+  const data = await postalRequest(config, "/api/v1/send/raw", {
+    mail_from: fromEmail,
+    rcpt_to: [],
+    data: Buffer.from(raw).toString("base64"),
+  });
+  if (readSendResult(data, fromEmail).postalId !== null) {
+    throw new PostalApiError("response", "Postal queued the connection check. Please report this.");
   }
 }
