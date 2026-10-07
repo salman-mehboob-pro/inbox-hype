@@ -57,7 +57,7 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex h-8 items-center px-1.5 group-data-[collapsible=icon]:px-0">
+        <div className="flex h-8 items-center overflow-hidden px-1.5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <Logo className="group-data-[collapsible=icon]:[&>span:last-child]:hidden" />
         </div>
       </SidebarHeader>
