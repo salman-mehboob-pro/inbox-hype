@@ -8,6 +8,7 @@ import { testPostal, type CheckResult } from "@/lib/email/connection-test";
 import { logger } from "@/lib/logger";
 import { ensurePostalServer, sendSetupCheck } from "@/lib/postal/servers";
 import { classifySendError } from "@/lib/sending/errors";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { apiKeySchema, createAccountSchema, settingsSchema } from "./schema";
@@ -49,6 +50,12 @@ async function postalUrlOf(account: { postal_server_id: string }): Promise<strin
   return data?.api_url ?? null;
 }
 
+function alreadyConnected(inThisWorkspace: boolean) {
+  return inThisWorkspace
+    ? "This inbox is already connected."
+    : "This inbox is already connected in another workspace. Remove it there first.";
+}
+
 // A Postal inbox: URL + API key, checked before saving (without sending an email).
 export async function createEmailAccount(input: unknown): Promise<ActionResult> {
   const { workspace } = await getCurrentWorkspace();
@@ -58,13 +65,18 @@ export async function createEmailAccount(input: unknown): Promise<ActionResult> 
   const v = parsed.data;
 
   const supabase = await createClient();
-  const { data: existing } = await supabase
+  // One inbox can be in only ONE workspace (so its replies land in one place).
+  // RLS hides other workspaces, so this check reads with the server key.
+  const { data: existing, error: existingError } = await createAdminClient()
     .from("email_accounts")
-    .select("id")
-    .eq("workspace_id", workspace.id)
+    .select("workspace_id")
     .eq("email", v.email)
     .maybeSingle();
-  if (existing) return { ok: false, fieldErrors: { email: ["This inbox is already connected."] } };
+  if (existingError) {
+    logger.error("inbox duplicate check failed", { error: existingError, workspaceId: workspace.id });
+    return { ok: false, error: GENERIC_ERROR };
+  }
+  if (existing) return { ok: false, fieldErrors: { email: [alreadyConnected(existing.workspace_id === workspace.id)] } };
 
   const test = await testPostal({ apiUrl: v.apiUrl, apiKey: v.apiKey }, v.email);
   if (!test.ok) return { ok: false, test, error: test.error };
@@ -89,6 +101,8 @@ export async function createEmailAccount(input: unknown): Promise<ActionResult> 
     last_tested_at: new Date().toISOString(),
   });
   if (insertError) {
+    // Added at the same moment somewhere else.
+    if (insertError.code === "23505") return { ok: false, fieldErrors: { email: [alreadyConnected(false)] } };
     logger.error("create email account failed", { error: insertError, workspaceId: workspace.id });
     return { ok: false, test, error: GENERIC_ERROR };
   }

@@ -17,11 +17,3 @@ export function PageHeader({
     </div>
   );
 }
-
-export function ComingSoon({ step }: { step: string }) {
-  return (
-    <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed p-12 text-center text-sm text-muted-foreground">
-      This screen is built in {step}.
-    </div>
-  );
-}

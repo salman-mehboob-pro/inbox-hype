@@ -4,7 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { AppSidebar } from "./app-sidebar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, workspace } = await getCurrentWorkspace();
+  const { user, workspace, workspaces } = await getCurrentWorkspace();
 
   // Unread replies, shown next to "Unibox". A failed count just hides the badge.
   const supabase = await createClient();
@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <SidebarProvider>
-      <AppSidebar email={user.email} workspaceName={workspace.name} unreadReplies={unreadReplies ?? 0} />
+      <AppSidebar email={user.email} workspaces={workspaces} unreadReplies={unreadReplies ?? 0} />
       <SidebarInset>
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />

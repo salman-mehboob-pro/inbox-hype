@@ -803,6 +803,32 @@ export type Database = {
           },
         ]
       }
+      user_settings: {
+        Row: {
+          active_workspace_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active_workspace_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active_workspace_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_settings_active_workspace_id_fkey"
+            columns: ["active_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string
@@ -1070,6 +1096,18 @@ export type Database = {
           tag: string
         }[]
       }
+      my_workspaces: {
+        Args: never
+        Returns: {
+          id: string
+          is_active: boolean
+          name: string
+          role: string
+        }[]
+      }
+      switch_workspace: { Args: { p_workspace_id: string }; Returns: undefined }
+      create_workspace: { Args: { p_name: string }; Returns: string }
+      delete_workspace: { Args: { p_workspace_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

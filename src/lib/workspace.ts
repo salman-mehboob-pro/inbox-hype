@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
-// The logged-in user and their workspace. Cached per request.
-// v1: one workspace per user (created at signup).
+// The logged-in user, their open workspace and all their workspaces (for the
+// switcher). Cached per request. The database decides which workspace is open
+// (`user_settings`), and RLS only shows that one.
 export const getCurrentWorkspace = cache(async () => {
   const supabase = await createClient();
 
@@ -12,18 +13,23 @@ export const getCurrentWorkspace = cache(async () => {
   const claims = claimsData?.claims;
   if (!claims) redirect("/login");
 
-  const { data: workspace, error } = await supabase
+  const { data: workspaces, error } = await supabase.rpc("my_workspaces");
+  if (error) throw error;
+
+  const active = workspaces?.find((w) => w.is_active);
+  if (!active) throw new Error("No workspace found for this user");
+
+  const { data: workspace, error: wsError } = await supabase
     .from("workspaces")
     .select("id, name, timezone")
-    .order("created_at", { ascending: true })
-    .limit(1)
+    .eq("id", active.id)
     .maybeSingle();
-
-  if (error) throw error;
+  if (wsError) throw wsError;
   if (!workspace) throw new Error("No workspace found for this user");
 
   return {
     user: { id: claims.sub, email: typeof claims.email === "string" ? claims.email : "" },
-    workspace,
+    workspace: { ...workspace, role: active.role },
+    workspaces: workspaces.map((w) => ({ id: w.id, name: w.name, isActive: w.is_active })),
   };
 });

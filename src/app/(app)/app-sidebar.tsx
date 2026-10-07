@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  ChevronsUpDownIcon,
   InboxIcon,
   LayoutDashboardIcon,
-  LogOutIcon,
   MailIcon,
   MegaphoneIcon,
   SettingsIcon,
@@ -13,12 +11,6 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/logo";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -32,7 +24,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { logout } from "../(auth)/actions";
+import { WorkspaceSwitcher, type WorkspaceOption } from "./workspace-switcher";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
@@ -45,11 +37,11 @@ const NAV = [
 
 export function AppSidebar({
   email,
-  workspaceName,
+  workspaces,
   unreadReplies,
 }: {
   email: string;
-  workspaceName: string;
+  workspaces: WorkspaceOption[];
   unreadReplies: number;
 }) {
   const pathname = usePathname();
@@ -89,24 +81,7 @@ export function AppSidebar({
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger render={<SidebarMenuButton size="lg" />}>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-medium uppercase">
-                  {email.slice(0, 2)}
-                </span>
-                <span className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{workspaceName}</span>
-                  <span className="truncate text-xs text-muted-foreground">{email}</span>
-                </span>
-                <ChevronsUpDownIcon className="ml-auto size-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="min-w-56">
-                <DropdownMenuItem onClick={() => logout()}>
-                  <LogOutIcon />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <WorkspaceSwitcher workspaces={workspaces} email={email} />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
