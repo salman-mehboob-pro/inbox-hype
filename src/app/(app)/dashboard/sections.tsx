@@ -36,11 +36,14 @@ export function StatCard({
   previous,
   days,
   note,
+  href,
 }: {
   label: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
   tone: keyof typeof TONES;
+  // Makes the whole card a link (e.g. "Emails sent" opens the Unibox Sent tab).
+  href?: string;
   // Both given: shows the change against the period before.
   current?: number;
   previous?: number;
@@ -48,8 +51,8 @@ export function StatCard({
   note?: string;
 }) {
   const change = current !== undefined && previous !== undefined ? percentChange(current, previous) : null;
-  return (
-    <Card>
+  const card = (
+    <Card className={cn(href && "h-full transition-colors hover:bg-muted/60")}>
       <CardContent className="flex items-start justify-between gap-3">
         <div className="grid gap-1">
           <p className="text-sm text-muted-foreground">{label}</p>
@@ -74,6 +77,13 @@ export function StatCard({
         </span>
       </CardContent>
     </Card>
+  );
+  return href ? (
+    <Link href={href} aria-label={`${label}: ${value}`}>
+      {card}
+    </Link>
+  ) : (
+    card
   );
 }
 

@@ -70,6 +70,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           previous={previous.sent}
           days={days}
           note={`Last ${days} days`}
+          href="/inbox?filter=sent"
         />
         <StatCard
           label="Replies"

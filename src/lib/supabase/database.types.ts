@@ -907,6 +907,10 @@ export type Database = {
         }
         Returns: string
       }
+      ingest_other: {
+        Args: { p_account_id: string; p_message: Json }
+        Returns: string
+      }
       record_click: {
         Args: { p_meta?: Json; p_sent_message_id: string; p_url: string }
         Returns: boolean
@@ -1032,6 +1036,29 @@ export type Database = {
           subject: string
           total_count: number
           unread_count: number
+        }[]
+      }
+      unibox_sent_list: {
+        Args: { p_limit?: number; p_offset?: number; p_search?: string }
+        Returns: {
+          campaign_id: string | null
+          campaign_name: string | null
+          clicked: boolean
+          delivery_status: string | null
+          id: string
+          inbox_email: string | null
+          lead_id: string | null
+          lead_name: string | null
+          opened: boolean
+          preview: string
+          replied: boolean
+          sent_at: string
+          source: string
+          status: string
+          step_position: number | null
+          subject: string
+          to_email: string
+          total_count: number
         }[]
       }
       workspace_custom_field_keys: {

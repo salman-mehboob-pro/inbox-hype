@@ -14,8 +14,18 @@ const categoryItems = [
   { value: "none", label: "No category" },
 ];
 
-// Search box + category filter (both keep the chosen tab).
-export function InboxToolbar({ q, filter, category }: { q: string; filter: string; category: string }) {
+// Search box + category filter (both keep the chosen tab). The Sent tab has no categories.
+export function InboxToolbar({
+  q,
+  filter,
+  category,
+  showCategory = true,
+}: {
+  q: string;
+  filter: string;
+  category: string;
+  showCategory?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [search, setSearch] = useState(q);
@@ -49,22 +59,24 @@ export function InboxToolbar({ q, filter, category }: { q: string; filter: strin
           aria-label="Search messages"
         />
       </div>
-      <Select
-        items={categoryItems}
-        value={category || ALL}
-        onValueChange={(v) => go({ q: search, category: v === ALL ? "" : String(v) })}
-      >
-        <SelectTrigger className="w-full" aria-label="Filter by category">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {categoryItems.map((c) => (
-            <SelectItem key={c.value} value={c.value}>
-              {c.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {showCategory && (
+        <Select
+          items={categoryItems}
+          value={category || ALL}
+          onValueChange={(v) => go({ q: search, category: v === ALL ? "" : String(v) })}
+        >
+          <SelectTrigger className="w-full" aria-label="Filter by category">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {categoryItems.map((c) => (
+              <SelectItem key={c.value} value={c.value}>
+                {c.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </div>
   );
 }

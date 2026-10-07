@@ -5,9 +5,12 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import type { Json, Tables } from "@/lib/supabase/database.types";
 import { classifyInbound, extractMessageIds, parseHeaderBlock, type InboundKind } from "./parse";
 
-// Records one incoming email (a whole raw message, from the Postal route) if it
-// belongs to one of our emails: a reply, an out-of-office, or a bounce report.
-// Mail from people we never emailed is not stored.
+// Records one incoming email (a whole raw message, from the Postal route).
+//   - A reply, out-of-office or bounce report about one of our emails is linked
+//     to that email (a reply stops the lead's sequence).
+//   - Anything else sent to one of the user's inboxes (someone who is not in a
+//     campaign, a newsletter, a notice ...) is stored as "other" mail, so the
+//     Unibox shows everything that arrives.
 
 type Admin = ReturnType<typeof createAdminClient>;
 type SentRef = Pick<
@@ -16,6 +19,9 @@ type SentRef = Pick<
 >;
 
 const SENT_COLUMNS = "id, message_id, to_email, status, created_at, replied_at, campaign_lead_id, email_account_id";
+
+// What happened to the message: stored as one of the kinds, or not stored.
+export type IngestResult = InboundKind | "ignored";
 
 // The header lines of a raw email (everything before the first empty line).
 export function rawHeaderBlock(raw: Buffer): string {
@@ -29,6 +35,9 @@ export async function ingestRawMessage(
   args: {
     // The inboxes the message may belong to (all inboxes of the Postal server).
     accountIds: string[];
+    // The inbox it was delivered to, for "other" mail. null = not one of the
+    // user's inboxes: only replies about our emails are stored.
+    deliveredToAccountId: string | null;
     raw: Buffer;
     // Used when the message has no Message-ID header (it must be unique per inbox).
     fallbackMessageId: string;
@@ -36,33 +45,15 @@ export async function ingestRawMessage(
     defaultTo: string | null;
     source: "postal_route";
   },
-): Promise<InboundKind> {
-  if (args.accountIds.length === 0) return "other";
+): Promise<IngestResult> {
+  if (args.accountIds.length === 0) return "ignored";
   const fields = parseHeaderBlock(rawHeaderBlock(args.raw));
   const parsed = await simpleParser(args.raw).catch(() => null);
-  if (!parsed) return "other"; // unreadable: skip it, it would never get better
+  if (!parsed) return "ignored"; // unreadable: skip it, it would never get better
 
   const from = parsed.from?.value?.[0];
   const fromAddress = (from?.address ?? "").toLowerCase();
   const subject = parsed.subject ?? "";
-  const rawText = args.raw.toString("utf8");
-  const classified = classifyInbound({ fromAddress, subject, headers: fields, raw: rawText });
-  if (classified.kind === "other") return "other";
-
-  // Which of our emails is this about?
-  const ownId = parsed.messageId?.toLowerCase();
-  let ids: string[];
-  let leadEmail: string | null;
-  if (classified.kind === "bounce") {
-    ids = classified.report.originalMessageIds.filter((id) => id !== ownId);
-    leadEmail = classified.report.recipient;
-  } else {
-    ids = extractMessageIds(parsed.inReplyTo, fields["in-reply-to"], fields["references"]);
-    leadEmail = fromAddress || null;
-  }
-  const match = await findSentMessage(admin, args.accountIds, ids, leadEmail, classified.kind === "bounce");
-  if (!match || !match.sent.email_account_id) return "other";
-
   const references = Array.isArray(parsed.references) ? parsed.references.join(" ") : (parsed.references ?? null);
   const message = {
     message_id: parsed.messageId ?? args.fallbackMessageId,
@@ -82,16 +73,41 @@ export async function ingestRawMessage(
     source: args.source,
   } satisfies Json;
 
-  const { data, error } = await admin.rpc("ingest_inbound", {
-    p_account_id: match.sent.email_account_id,
-    p_kind: classified.kind,
-    p_sent_message_id: match.sent.id,
-    p_match_method: match.method,
+  const classified = classifyInbound({ fromAddress, subject, headers: fields, raw: args.raw.toString("utf8") });
+  if (classified.kind !== "other") {
+    // Which of our emails is this about?
+    const ownId = parsed.messageId?.toLowerCase();
+    let ids: string[];
+    let leadEmail: string | null;
+    if (classified.kind === "bounce") {
+      ids = classified.report.originalMessageIds.filter((id) => id !== ownId);
+      leadEmail = classified.report.recipient;
+    } else {
+      ids = extractMessageIds(parsed.inReplyTo, fields["in-reply-to"], fields["references"]);
+      leadEmail = fromAddress || null;
+    }
+    const match = await findSentMessage(admin, args.accountIds, ids, leadEmail, classified.kind === "bounce");
+    if (match?.sent.email_account_id) {
+      const { data, error } = await admin.rpc("ingest_inbound", {
+        p_account_id: match.sent.email_account_id,
+        p_kind: classified.kind,
+        p_sent_message_id: match.sent.id,
+        p_match_method: match.method,
+        p_message: message,
+      });
+      if (error) throw error;
+      return data === "stored" ? classified.kind : "ignored";
+    }
+  }
+
+  // Not about one of our emails: keep it as "other" mail of the inbox it was sent to.
+  if (!args.deliveredToAccountId) return "ignored";
+  const { data, error } = await admin.rpc("ingest_other", {
+    p_account_id: args.deliveredToAccountId,
     p_message: message,
   });
   if (error) throw error;
-  if (data === "duplicate" || data === "no_match") return "other";
-  return classified.kind;
+  return data === "stored" ? "other" : "ignored";
 }
 
 // The sent email an inbound message belongs to.

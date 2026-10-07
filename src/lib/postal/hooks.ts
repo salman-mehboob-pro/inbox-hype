@@ -211,11 +211,21 @@ export async function handlePostalInbound(token: string, body: unknown): Promise
   const fallbackId = mail.postalId ?? createHash("sha256").update(mail.raw).digest("hex").slice(0, 32);
   const kind = await ingestRawMessage(admin, {
     accountIds: inboxes.map((i) => i.id),
+    deliveredToAccountId: deliveredTo(inboxes, mail.rcptTo),
     raw: mail.raw,
     fallbackMessageId: `<postal-in-${fallbackId}@${new URL(server.api_url).hostname}>`,
     defaultTo: mail.rcptTo,
     source: "postal_route",
   });
-  if (kind !== "other") logger.info("postal route: message recorded", { serverId: server.id, kind });
-  return { status: 200, result: kind === "other" ? "ignored" : kind };
+  if (kind !== "ignored") logger.info("postal route: message recorded", { serverId: server.id, kind });
+  return { status: 200, result: kind };
+}
+
+// The user's inbox the mail was delivered to ("sales+x@a.com" counts as "sales@a.com").
+// null = an address of the domain that is not connected in InboxHype.
+function deliveredTo(inboxes: { id: string; email: string }[], rcptTo: string | null): string | null {
+  if (!rcptTo) return null;
+  const [local, domain] = rcptTo.toLowerCase().split("@");
+  const address = `${local.split("+")[0]}@${domain}`;
+  return inboxes.find((i) => i.email.toLowerCase() === address)?.id ?? null;
 }
