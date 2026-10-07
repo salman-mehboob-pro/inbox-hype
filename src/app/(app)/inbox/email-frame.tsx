@@ -50,7 +50,7 @@ function EmailFrame({ html, title }: { html: string; title: string }) {
   const [height, setHeight] = useState(48);
 
   const doc = `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>
-    html,body{overflow:hidden}
+    html,body{overflow:hidden;height:auto!important;min-height:0!important}
     body{font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111;margin:0;padding:8px;word-wrap:break-word}
     p{margin:0 0 .75em} img{max-width:100%;height:auto} blockquote{border-left:3px solid #ddd;margin:0 0 .75em;padding-left:.75em;color:#555}
     body>*:last-child{margin-bottom:0}
@@ -63,11 +63,14 @@ function EmailFrame({ html, title }: { html: string; title: string }) {
     const win = frame?.contentWindow as (Window & typeof globalThis) | null;
     if (!inner?.documentElement || !win) return;
 
-    // +2 = the frame's own 1px border (the frame is border-box).
-    const measure = () => setHeight(Math.max(Math.ceil(inner.documentElement.scrollHeight) + 2, 48));
+    // The body's own height, not the page's: the page is never smaller than the
+    // frame, so measuring it would let the frame grow but never shrink again
+    // (e.g. after "Hide quoted text"). +2 = the frame's own 1px border.
+    const body = inner.body;
+    const measure = () => setHeight(Math.max(Math.ceil(body.getBoundingClientRect().height) + 2, 48));
     measure();
     const observer = new win.ResizeObserver(measure);
-    observer.observe(inner.documentElement);
+    observer.observe(body);
     const images = [...inner.images];
     images.forEach((img) => img.addEventListener("load", measure));
     stop.current = () => {

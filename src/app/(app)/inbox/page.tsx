@@ -126,8 +126,10 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
           </div>
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-start">
-          <section className={cn("grid gap-3", selectedId && "hidden lg:grid")}>
+        // Wide screens: the list and the conversation each fill the window height
+        // and scroll on their own. Phones: one column, the page scrolls.
+        <div className="grid gap-4 lg:h-[calc(100svh-11rem)] lg:min-h-[28rem] lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+          <section className={cn("flex min-h-0 flex-col gap-3", selectedId && "hidden lg:flex")}>
             <InboxToolbar q={q} filter={filter} category={category} />
             <nav className="flex flex-wrap gap-1" aria-label="Filter messages">
               {FILTERS.map((f) => (
@@ -145,26 +147,28 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
               ))}
             </nav>
 
-            {rows.length === 0 ? (
-              <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                No conversations match.
-              </p>
-            ) : (
-              <ThreadList rows={rows} openId={openId} clearHref={href({})} />
-            )}
+            <div className="grid min-h-0 content-start gap-3 lg:flex-1 lg:overflow-y-auto">
+              {rows.length === 0 ? (
+                <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                  No conversations match.
+                </p>
+              ) : (
+                <ThreadList rows={rows} openId={openId} clearHref={href({})} />
+              )}
 
-            {pages > 1 && (
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                {page > 1 ? <Link href={href({ page: page - 1 })}>← Newer</Link> : <span />}
-                <span>
-                  Page {page} of {pages}
-                </span>
-                {page < pages ? <Link href={href({ page: page + 1 })}>Older →</Link> : <span />}
-              </div>
-            )}
+              {pages > 1 && (
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  {page > 1 ? <Link href={href({ page: page - 1 })}>← Newer</Link> : <span />}
+                  <span>
+                    Page {page} of {pages}
+                  </span>
+                  {page < pages ? <Link href={href({ page: page + 1 })}>Older →</Link> : <span />}
+                </div>
+              )}
+            </div>
           </section>
 
-          <section className={cn("min-w-0", !selectedId && "hidden lg:block")}>
+          <section className={cn("min-h-0 min-w-0 lg:overflow-y-auto", !selectedId && "hidden lg:block")}>
             {openId ? (
               <Thread id={openId} backHref={href({ page })} />
             ) : (
