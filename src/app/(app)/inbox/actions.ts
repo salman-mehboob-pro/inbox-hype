@@ -74,8 +74,8 @@ export async function sendReply(id: string, body: unknown): Promise<InboxActionR
     return { ok: false, error: GENERIC_ERROR };
   }
   if (!original) return { ok: false, error: "Message not found." };
-  if (original.direction !== "inbound" || (original.kind !== "reply" && original.kind !== "other")) {
-    return { ok: false, error: "You can only reply to an email a person sent." };
+  if (original.direction !== "inbound" || original.kind !== "reply") {
+    return { ok: false, error: "You can only reply to a person's reply." };
   }
 
   const { data: inbox, error: inboxError } = await supabase

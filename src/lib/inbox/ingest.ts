@@ -5,12 +5,9 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import type { Json, Tables } from "@/lib/supabase/database.types";
 import { classifyInbound, extractMessageIds, parseHeaderBlock, type InboundKind } from "./parse";
 
-// Records one incoming email (a whole raw message, from the Postal route).
-//   - A reply, out-of-office or bounce report about one of our emails is linked
-//     to that email (a reply stops the lead's sequence).
-//   - Anything else sent to one of the user's inboxes (someone who is not in a
-//     campaign, a newsletter, a notice ...) is stored as "other" mail, so the
-//     Unibox shows everything that arrives.
+// Records one incoming email (a whole raw message, from the Postal route) if it
+// belongs to one of our emails: a reply, an out-of-office, or a bounce report
+// (a reply stops the lead's sequence). Anything else is not stored.
 
 type Admin = ReturnType<typeof createAdminClient>;
 type SentRef = Pick<
@@ -35,9 +32,6 @@ export async function ingestRawMessage(
   args: {
     // The inboxes the message may belong to (all inboxes of the Postal server).
     accountIds: string[];
-    // The inbox it was delivered to, for "other" mail. null = not one of the
-    // user's inboxes: only replies about our emails are stored.
-    deliveredToAccountId: string | null;
     raw: Buffer;
     // Used when the message has no Message-ID header (it must be unique per inbox).
     fallbackMessageId: string;
@@ -74,40 +68,31 @@ export async function ingestRawMessage(
   } satisfies Json;
 
   const classified = classifyInbound({ fromAddress, subject, headers: fields, raw: args.raw.toString("utf8") });
-  if (classified.kind !== "other") {
-    // Which of our emails is this about?
-    const ownId = parsed.messageId?.toLowerCase();
-    let ids: string[];
-    let leadEmail: string | null;
-    if (classified.kind === "bounce") {
-      ids = classified.report.originalMessageIds.filter((id) => id !== ownId);
-      leadEmail = classified.report.recipient;
-    } else {
-      ids = extractMessageIds(parsed.inReplyTo, fields["in-reply-to"], fields["references"]);
-      leadEmail = fromAddress || null;
-    }
-    const match = await findSentMessage(admin, args.accountIds, ids, leadEmail, classified.kind === "bounce");
-    if (match?.sent.email_account_id) {
-      const { data, error } = await admin.rpc("ingest_inbound", {
-        p_account_id: match.sent.email_account_id,
-        p_kind: classified.kind,
-        p_sent_message_id: match.sent.id,
-        p_match_method: match.method,
-        p_message: message,
-      });
-      if (error) throw error;
-      return data === "stored" ? classified.kind : "ignored";
-    }
-  }
+  if (classified.kind === "other") return "ignored";
 
-  // Not about one of our emails: keep it as "other" mail of the inbox it was sent to.
-  if (!args.deliveredToAccountId) return "ignored";
-  const { data, error } = await admin.rpc("ingest_other", {
-    p_account_id: args.deliveredToAccountId,
+  // Which of our emails is this about?
+  const ownId = parsed.messageId?.toLowerCase();
+  let ids: string[];
+  let leadEmail: string | null;
+  if (classified.kind === "bounce") {
+    ids = classified.report.originalMessageIds.filter((id) => id !== ownId);
+    leadEmail = classified.report.recipient;
+  } else {
+    ids = extractMessageIds(parsed.inReplyTo, fields["in-reply-to"], fields["references"]);
+    leadEmail = fromAddress || null;
+  }
+  const match = await findSentMessage(admin, args.accountIds, ids, leadEmail, classified.kind === "bounce");
+  if (!match?.sent.email_account_id) return "ignored"; // not about one of our emails
+
+  const { data, error } = await admin.rpc("ingest_inbound", {
+    p_account_id: match.sent.email_account_id,
+    p_kind: classified.kind,
+    p_sent_message_id: match.sent.id,
+    p_match_method: match.method,
     p_message: message,
   });
   if (error) throw error;
-  return data === "stored" ? "other" : "ignored";
+  return data === "stored" ? classified.kind : "ignored";
 }
 
 // The sent email an inbound message belongs to.

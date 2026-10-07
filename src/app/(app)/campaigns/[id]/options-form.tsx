@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2Icon, Trash2Icon } from "lucide-react";
+import { Loader2Icon, PlusIcon, Trash2Icon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -48,6 +48,8 @@ export function OptionsForm({
   const [form, setForm] = useState(initial);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[] | undefined>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [toAdd, setToAdd] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
   const dirty = JSON.stringify(form) !== JSON.stringify(initial);
 
@@ -71,6 +73,11 @@ export function OptionsForm({
   const gapMax = Number(form.gap_max_minutes);
   const gapValid = Number.isInteger(gapMin) && Number.isInteger(gapMax) && gapMin >= 1 && gapMax >= gapMin;
 
+  const chosen = form.email_account_ids
+    .map((id) => accounts.find((a) => a.id === id))
+    .filter((a): a is Account => Boolean(a));
+  const notChosen = accounts.filter((a) => !form.email_account_ids.includes(a.id));
+
   const inboxCapacity = accounts
     .filter((a) => form.email_account_ids.includes(a.id) && a.status === "active")
     .reduce((sum, a) => sum + a.daily_limit, 0);
@@ -87,25 +94,13 @@ export function OptionsForm({
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2">
-            {accounts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No inboxes yet.{" "}
-                <Link href="/email-accounts/new" className="text-primary underline-offset-4 hover:underline">
-                  Add an email account
-                </Link>
+            {chosen.length === 0 ? (
+              <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                No inbox chosen yet. Add at least one inbox to start this campaign.
               </p>
             ) : (
-              accounts.map((a) => (
-                <label key={a.id} className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm">
-                  <Checkbox
-                    checked={form.email_account_ids.includes(a.id)}
-                    onCheckedChange={(c) =>
-                      set(
-                        "email_account_ids",
-                        c ? [...form.email_account_ids, a.id] : form.email_account_ids.filter((x) => x !== a.id),
-                      )
-                    }
-                  />
+              chosen.map((a) => (
+                <div key={a.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
                   <span className="grid min-w-0 flex-1">
                     <span className="truncate font-medium">{a.email}</span>
                     <span className="text-xs text-muted-foreground">
@@ -114,9 +109,43 @@ export function OptionsForm({
                     </span>
                   </span>
                   <AccountStatusBadge status={a.status} />
-                </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Remove ${a.email}`}
+                    onClick={() => set("email_account_ids", form.email_account_ids.filter((x) => x !== a.id))}
+                  >
+                    <XIcon />
+                  </Button>
+                </div>
               ))
             )}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="justify-self-start"
+                disabled={notChosen.length === 0}
+                onClick={() => {
+                  setToAdd([]);
+                  setAdding(true);
+                }}
+              >
+                <PlusIcon />
+                Add inbox
+              </Button>
+              {accounts.length === 0 ? (
+                <span className="text-sm text-muted-foreground">
+                  No inboxes connected yet.{" "}
+                  <Link href="/email-accounts/new" className="text-primary underline-offset-4 hover:underline">
+                    Connect an inbox
+                  </Link>
+                </span>
+              ) : (
+                notChosen.length === 0 && <span className="text-sm text-muted-foreground">All your inboxes are added.</span>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -222,6 +251,46 @@ export function OptionsForm({
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={adding} onOpenChange={setAdding}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add inboxes</DialogTitle>
+            <DialogDescription>Choose the inboxes this campaign sends from. Save the options afterwards.</DialogDescription>
+          </DialogHeader>
+          <div className="grid max-h-80 gap-2 overflow-y-auto">
+            {notChosen.map((a) => (
+              <label key={a.id} className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm">
+                <Checkbox
+                  checked={toAdd.includes(a.id)}
+                  onCheckedChange={(c) => setToAdd((prev) => (c ? [...prev, a.id] : prev.filter((x) => x !== a.id)))}
+                />
+                <span className="grid min-w-0 flex-1">
+                  <span className="truncate font-medium">{a.email}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {a.from_name ? `${a.from_name} · ` : ""}
+                    {a.daily_limit}/day
+                  </span>
+                </span>
+                <AccountStatusBadge status={a.status} />
+              </label>
+            ))}
+          </div>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+            <Button
+              disabled={toAdd.length === 0}
+              onClick={() => {
+                set("email_account_ids", [...form.email_account_ids, ...toAdd]);
+                setAdding(false);
+              }}
+            >
+              <PlusIcon />
+              Add {toAdd.length > 0 ? toAdd.length : ""} {toAdd.length === 1 ? "inbox" : "inboxes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent>

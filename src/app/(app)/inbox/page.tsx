@@ -19,7 +19,6 @@ const FILTERS = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
   { key: "replies", label: "Replies" },
-  { key: "other", label: "Other mail" },
   { key: "auto", label: "Out of office" },
   { key: "bounced", label: "Bounced" },
   { key: "sent", label: "Sent" },
@@ -153,13 +152,13 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
       : "No emails sent yet. Campaign emails and your replies show up here."
     : filter === "all" && !q && !category
       ? readable.count
-        ? "No messages yet. Replies to your campaigns and any other mail sent to your inboxes show up here right away."
-        : "Mail can't arrive yet. Open your Postal inbox in Email accounts and finish the one-time Postal setup."
+        ? "No replies yet. When a lead answers one of your campaign emails, it shows up here right away. Bounces and out-of-office answers appear here too."
+        : "Replies can't arrive yet. Open your Postal inbox in Email accounts and finish the one-time Postal setup."
       : "No conversations match.";
 
   return (
     <>
-      <PageHeader title="Unibox" description="All mail from all your inboxes in one place, and everything you sent." />
+      <PageHeader title="Unibox" description="All replies from all your inboxes in one place, and everything you sent." />
 
       {/* Wide screens: the list and the conversation each fill the window height
           and scroll on their own. Phones: one column, the page scrolls. */}

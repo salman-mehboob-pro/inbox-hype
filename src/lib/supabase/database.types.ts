@@ -907,10 +907,6 @@ export type Database = {
         }
         Returns: string
       }
-      ingest_other: {
-        Args: { p_account_id: string; p_message: Json }
-        Returns: string
-      }
       record_click: {
         Args: { p_meta?: Json; p_sent_message_id: string; p_url: string }
         Returns: boolean

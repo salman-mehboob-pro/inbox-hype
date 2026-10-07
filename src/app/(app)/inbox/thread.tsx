@@ -44,8 +44,8 @@ type InboxMessage = {
   message_id: string;
 };
 
-// Which conversation: one inbox + one lead in one campaign, or (no campaign)
-// one lead / one outside address on that inbox.
+// Which conversation: one inbox + one lead in one campaign. Without a lead or
+// campaign (they were deleted): the person's address on that inbox.
 type ConversationKey = {
   inboxId: string;
   leadId: string | null;
@@ -214,7 +214,7 @@ function Messages({ items }: { items: Item[] }) {
   );
 }
 
-// The reply box answers the newest message the person sent (a real reply or other mail).
+// The reply box answers the newest real reply the person sent.
 function Reply({ conversation, target }: { conversation: Conversation; target: InboxMessage | undefined }) {
   const inbox = conversation.inbox;
   if (!target || !inbox) return null;
@@ -231,7 +231,7 @@ function Reply({ conversation, target }: { conversation: Conversation; target: I
 
 function replyTarget(messages: InboxMessage[]) {
   return messages
-    .filter((m) => m.direction === "inbound" && (m.kind === "reply" || m.kind === "other"))
+    .filter((m) => m.direction === "inbound" && m.kind === "reply")
     .sort((a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime())[0];
 }
 

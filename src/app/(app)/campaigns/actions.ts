@@ -62,18 +62,7 @@ export async function createCampaign(input: { name?: string; timezone?: string }
   });
   if (stepError) logger.error("create first step failed", { error: stepError, campaignId: campaign.id });
 
-  // Use all healthy inboxes by default (inbox rotation).
-  const { data: accounts } = await supabase
-    .from("email_accounts")
-    .select("id")
-    .eq("workspace_id", workspace.id)
-    .eq("status", "active");
-  if (accounts?.length) {
-    await supabase.from("campaign_email_accounts").insert(
-      accounts.map((a) => ({ campaign_id: campaign.id, email_account_id: a.id, workspace_id: workspace.id })),
-    );
-  }
-
+  // No inbox is chosen yet: the user adds the inboxes in the Options tab.
   revalidatePath("/campaigns");
   return { ok: true, id: campaign.id };
 }
