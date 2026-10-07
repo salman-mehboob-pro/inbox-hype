@@ -1,8 +1,6 @@
 import {
   ArrowDownRightIcon,
   ArrowUpRightIcon,
-  CheckCircle2Icon,
-  CircleIcon,
   InboxIcon,
   MegaphoneIcon,
   TriangleAlertIcon,
@@ -16,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { CampaignStatusBadge } from "../campaigns/status-badge";
 import { AccountStatusBadge } from "../email-accounts/status-badge";
 import { EVENT_TYPES } from "./event-types";
-import { formatPercent, percent, percentChange, type DashboardCampaign, type DashboardInbox, type DashboardStats } from "./stats";
+import { formatPercent, percent, percentChange, type DashboardCampaign, type DashboardInbox } from "./stats";
 
 // Top cards ---------------------------------------------------------------------------
 
@@ -360,52 +358,6 @@ export function ActivityFeed({ rows }: { rows: FeedRow[] }) {
             })}
           </ul>
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// First steps (only while something is still missing) ---------------------------------
-
-export function GettingStarted({ counts, started }: { counts: DashboardStats["counts"]; started: boolean }) {
-  const steps = [
-    { done: counts.inboxes > 0, label: "Connect an inbox", text: "The email address emails are sent from.", href: "/email-accounts/new" },
-    { done: counts.leads > 0, label: "Add leads", text: "Import a CSV or add people by hand.", href: "/leads" },
-    { done: counts.campaigns > 0, label: "Create a campaign", text: "Write the emails and pick the leads.", href: "/campaigns" },
-    { done: started, label: "Start it", text: "Emails go out slowly during your sending hours.", href: "/campaigns" },
-  ];
-  if (steps.every((s) => s.done)) return null;
-  const next = steps.findIndex((s) => !s.done);
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Get started</CardTitle>
-        <CardDescription>Four steps to your first campaign.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {steps.map((s, i) => (
-            <li key={s.label}>
-              <Link
-                href={s.href}
-                className={cn(
-                  "flex h-full items-start gap-3 rounded-xl border p-3 transition-colors hover:bg-muted",
-                  i === next && "border-primary",
-                )}
-              >
-                {s.done ? (
-                  <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-emerald-600" />
-                ) : (
-                  <CircleIcon className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                )}
-                <span className="grid gap-0.5">
-                  <span className={cn("text-sm font-medium", s.done && "text-muted-foreground line-through")}>{s.label}</span>
-                  <span className="text-xs text-muted-foreground">{s.text}</span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ol>
       </CardContent>
     </Card>
   );

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { ActivityChart } from "./activity-chart";
-import { ActivityFeed, CampaignsCard, GettingStarted, InboxHealthCard, SendingToday, SmallStat, StatCard } from "./sections";
+import { ActivityFeed, CampaignsCard, InboxHealthCard, SendingToday, SmallStat, StatCard } from "./sections";
 import { formatPercent, parseDashboardStats, percent } from "./stats";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -57,8 +57,6 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           </nav>
         }
       />
-
-      <GettingStarted counts={counts} started={stats.campaigns.some((c) => c.status !== "draft")} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
