@@ -1,7 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
-// Stops users pointing SMTP/IMAP at our own private network (SSRF).
+// Stops users pointing the Postal URL at our own private network (SSRF).
 // Allows only hosts that resolve to public IP addresses.
 
 export class BlockedHostError extends Error {}

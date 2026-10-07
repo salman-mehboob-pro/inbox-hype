@@ -1,5 +1,5 @@
 import "server-only";
-import { isPostalInbox, sendFromInbox } from "@/lib/email/send";
+import { sendFromInbox } from "@/lib/email/send";
 import { publicEnv, serverEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -18,7 +18,7 @@ import { deriveTrackingKey, oneClickUnsubscribeUrl, signClick } from "./tracking
 // ticks at the same time can never send the same email twice.
 
 type Admin = ReturnType<typeof createAdminClient>;
-// A Postal inbox brings its server's reply-route state (see repliesAreFresh).
+// Each inbox brings its Postal server's reply-route state (see repliesAreFresh).
 type Inbox = Tables<"email_accounts"> & { postal_server: { route_ok_at: string | null } | null };
 type CampaignLead = Tables<"campaign_leads"> & { lead: Tables<"leads"> | null };
 type ActiveCampaign = Tables<"campaigns"> & {
@@ -53,7 +53,7 @@ type Outcome =
   | { kind: "stop" } // this inbox can't send now
   | { kind: "campaign_cap"; campaignId: string };
 
-// Dry run (local only): everything happens except the SMTP call, so the whole
+// Dry run (local only): everything happens except the call to Postal, so the whole
 // flow can be checked without emailing anyone. Ignored in production.
 function isDryRun() {
   return process.env.TICK_DRY_RUN === "true" && process.env.NODE_ENV !== "production";
@@ -176,9 +176,7 @@ async function runInbox(
     throw followUps.error ?? fresh.error;
   }
 
-  // Follow-ups only go out while we can see replies. If this inbox reads its
-  // mail over IMAP but has not been checked for a while, a lead may already have
-  // answered, so we wait (new leads are not affected).
+  // Follow-ups only go out while we can see replies (new leads are not affected).
   const followUpCandidates = repliesAreFresh(inbox) ? (followUps.data as CampaignLead[]) : [];
   const candidates = [...followUpCandidates, ...(fresh.data as CampaignLead[])];
   const cappedCampaigns = new Set<string>();
@@ -283,7 +281,7 @@ async function trySend(
 
   const context = { campaignId: campaign.id, inboxId: inbox.id, step: step.position, sentMessageId };
 
-  // Build the email. A failure here is a bug or bad content, never an SMTP problem.
+  // Build the email. A failure here is a bug or bad content, never a sending problem.
   let message: ReturnType<typeof buildMessage>;
   try {
     message = buildMessage({
@@ -381,19 +379,12 @@ async function trySend(
   return { kind: "sent" };
 }
 
-const REPLIES_MAX_AGE_MS = 30 * 60 * 1000;
-
-// Can we see this inbox's replies right now?
-//   - IMAP inboxes: read in the last 30 minutes.
-//   - Postal inboxes: replies are pushed to us by the Postal route, so its setup
-//     must have been confirmed ("Check setup" on the inbox page). Until then
-//     only first emails go out, never follow-ups.
-//   - Inboxes without either can't be checked, so they are always "fresh".
+// Can we see this inbox's replies? They are pushed to us by the Postal route,
+// so its setup must have been confirmed ("Check setup" on the inbox page).
+// Until then only first emails go out, never follow-ups, so nobody who
+// already answered gets another email.
 function repliesAreFresh(inbox: Inbox): boolean {
-  if (isPostalInbox(inbox)) return Boolean(inbox.postal_server?.route_ok_at);
-  if (!inbox.imap_host) return true;
-  if (!inbox.imap_last_synced_at) return false;
-  return Date.now() - new Date(inbox.imap_last_synced_at).getTime() < REPLIES_MAX_AGE_MS;
+  return Boolean(inbox.postal_server?.route_ok_at);
 }
 
 // Database bookkeeping -------------------------------------------------------------

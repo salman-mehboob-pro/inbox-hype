@@ -206,21 +206,18 @@ export type Database = {
       }
       email_account_secrets: {
         Row: {
+          api_key_enc: string
           email_account_id: string
-          imap_password_enc: string | null
-          smtp_password_enc: string
           updated_at: string
         }
         Insert: {
+          api_key_enc: string
           email_account_id: string
-          imap_password_enc?: string | null
-          smtp_password_enc: string
           updated_at?: string
         }
         Update: {
+          api_key_enc?: string
           email_account_id?: string
-          imap_password_enc?: string | null
-          smtp_password_enc?: string
           updated_at?: string
         }
         Relationships: [
@@ -240,26 +237,12 @@ export type Database = {
           email: string
           from_name: string
           id: string
-          imap_host: string | null
-          imap_last_synced_at: string | null
-          imap_last_uid: number | null
-          imap_port: number | null
-          imap_secure: boolean
-          imap_uid_validity: number | null
-          imap_username: string | null
           last_error: string | null
           last_sent_at: string | null
           last_tested_at: string | null
-          max_delay_seconds: number
-          min_delay_seconds: number
           next_available_at: string | null
-          postal_server_id: string | null
-          provider: string
+          postal_server_id: string
           signature: string
-          smtp_host: string | null
-          smtp_port: number | null
-          smtp_secure: boolean
-          smtp_username: string | null
           status: string
           updated_at: string
           workspace_id: string
@@ -270,26 +253,12 @@ export type Database = {
           email: string
           from_name?: string
           id?: string
-          imap_host?: string | null
-          imap_last_synced_at?: string | null
-          imap_last_uid?: number | null
-          imap_port?: number | null
-          imap_secure?: boolean
-          imap_uid_validity?: number | null
-          imap_username?: string | null
           last_error?: string | null
           last_sent_at?: string | null
           last_tested_at?: string | null
-          max_delay_seconds?: number
-          min_delay_seconds?: number
           next_available_at?: string | null
-          postal_server_id?: string | null
-          provider?: string
+          postal_server_id: string
           signature?: string
-          smtp_host?: string | null
-          smtp_port?: number | null
-          smtp_secure?: boolean
-          smtp_username?: string | null
           status?: string
           updated_at?: string
           workspace_id: string
@@ -300,26 +269,12 @@ export type Database = {
           email?: string
           from_name?: string
           id?: string
-          imap_host?: string | null
-          imap_last_synced_at?: string | null
-          imap_last_uid?: number | null
-          imap_port?: number | null
-          imap_secure?: boolean
-          imap_uid_validity?: number | null
-          imap_username?: string | null
           last_error?: string | null
           last_sent_at?: string | null
           last_tested_at?: string | null
-          max_delay_seconds?: number
-          min_delay_seconds?: number
           next_available_at?: string | null
-          postal_server_id?: string | null
-          provider?: string
+          postal_server_id?: string
           signature?: string
-          smtp_host?: string | null
-          smtp_port?: number | null
-          smtp_secure?: boolean
-          smtp_username?: string | null
           status?: string
           updated_at?: string
           workspace_id?: string
@@ -415,7 +370,6 @@ export type Database = {
           from_name: string | null
           html_body: string | null
           id: string
-          imap_uid: number | null
           in_reply_to: string | null
           is_read: boolean
           kind: string
@@ -441,7 +395,6 @@ export type Database = {
           from_name?: string | null
           html_body?: string | null
           id?: string
-          imap_uid?: number | null
           in_reply_to?: string | null
           is_read?: boolean
           kind?: string
@@ -467,7 +420,6 @@ export type Database = {
           from_name?: string | null
           html_body?: string | null
           id?: string
-          imap_uid?: number | null
           in_reply_to?: string | null
           is_read?: boolean
           kind?: string

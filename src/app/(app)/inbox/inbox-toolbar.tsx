@@ -1,14 +1,10 @@
 "use client";
 
-import { Loader2Icon, RefreshCwIcon, SearchIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { plural } from "@/lib/format";
-import { syncNow } from "./actions";
 import { CATEGORIES } from "./categories";
 
 const ALL = "__all__";
@@ -70,33 +66,5 @@ export function InboxToolbar({ q, filter, category }: { q: string; filter: strin
         </SelectContent>
       </Select>
     </div>
-  );
-}
-
-export function CheckRepliesButton() {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
-
-  function check() {
-    startTransition(async () => {
-      const result = await syncNow();
-      if (!result.summary) {
-        toast.error(result.error ?? "Could not check for replies.");
-        return;
-      }
-      const { replies, bounces, autoReplies, inboxes, errors } = result.summary;
-      const found = replies + bounces + autoReplies;
-      if (errors) toast.error(result.error ?? "Could not check one of the inboxes.");
-      else if (inboxes === 0) toast.info("No inbox with reading (IMAP) turned on.");
-      else toast.success(found ? `${plural(replies, "new reply", "new replies")}, ${plural(bounces, "bounce")}` : "No new replies");
-      router.refresh();
-    });
-  }
-
-  return (
-    <Button variant="outline" onClick={check} disabled={pending}>
-      {pending ? <Loader2Icon className="animate-spin" /> : <RefreshCwIcon />}
-      {pending ? "Checking…" : "Check for replies"}
-    </Button>
   );
 }

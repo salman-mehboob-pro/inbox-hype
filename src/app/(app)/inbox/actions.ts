@@ -3,14 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { CATEGORY_KEYS } from "./categories";
-import { runInboxSync, type SyncSummary } from "@/lib/inbox/sync";
 import { sendManualReply } from "@/lib/inbox/reply";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 
-export type InboxActionResult = { ok: boolean; error?: string; summary?: SyncSummary };
+export type InboxActionResult = { ok: boolean; error?: string };
 
 const GENERIC_ERROR = "Something went wrong. Please try again.";
 const idSchema = z.uuid();
@@ -57,19 +56,6 @@ export async function bulkAction(input: unknown): Promise<InboxActionResult & { 
   }
   revalidatePath("/inbox");
   return { ok: true, count: data ?? 0 };
-}
-
-// Look for new replies and bounces now (instead of waiting for the next tick).
-export async function syncNow(): Promise<InboxActionResult> {
-  const { workspace } = await getCurrentWorkspace();
-  try {
-    const summary = await runInboxSync({ force: true, workspaceId: workspace.id, budgetMs: 45_000 });
-    revalidatePath("/inbox");
-    return { ok: summary.errors === 0, summary, error: summary.errors ? "Could not check one of the inboxes." : undefined };
-  } catch (error) {
-    logger.error("sync now failed", { error });
-    return { ok: false, error: GENERIC_ERROR };
-  }
 }
 
 export async function sendReply(id: string, body: unknown): Promise<InboxActionResult> {

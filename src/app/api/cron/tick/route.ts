@@ -1,6 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { serverEnv } from "@/lib/env";
-import { runInboxSync } from "@/lib/inbox/sync";
 import { logger } from "@/lib/logger";
 import { runTick } from "@/lib/sending/tick";
 
@@ -9,10 +8,8 @@ import { runTick } from "@/lib/sending/tick";
 // GET works too, so Vercel Cron could call it later. No cookies, no login:
 // the secret is the only way in.
 //
-// Each run does two things, in this order:
-//   1. read new replies / bounces from the inboxes (IMAP)
-//   2. send the emails that are due
-// Reading first means a lead who just answered is never sent a follow-up.
+// It sends the emails that are due. Replies and bounces are not read here:
+// Postal pushes them to us (/api/postal/inbound and /api/postal/webhook).
 
 // Vercel Hobby allows up to 300 seconds.
 export const maxDuration = 300;
@@ -31,22 +28,12 @@ async function handle(request: Request) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const started = Date.now();
-  let sync = null;
   try {
-    sync = await runInboxSync({ budgetMs: 80_000 });
-  } catch (error) {
-    // Never let a mail-reading problem stop the sending of new leads.
-    logger.error("inbox sync crashed", { error });
-  }
-
-  try {
-    // The rest of the 300 s (minus a safety margin) is for sending.
-    const send = await runTick({ budgetMs: Math.max(30_000, 240_000 - (Date.now() - started)) });
-    return Response.json({ ...send, sync });
+    const send = await runTick({ budgetMs: 240_000 });
+    return Response.json(send);
   } catch (error) {
     logger.error("tick crashed", { error });
-    return Response.json({ error: "tick_failed", sync }, { status: 500 });
+    return Response.json({ error: "tick_failed" }, { status: 500 });
   }
 }
 

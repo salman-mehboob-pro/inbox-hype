@@ -1,5 +1,5 @@
 -- ============================================================================
--- Switch on the background job (sending emails + reading replies) on the LIVE site.
+-- Switch on the background job (sending the emails that are due) on the LIVE site.
 --
 -- HOW: open the Supabase dashboard -> SQL Editor -> New query, paste this file,
 --      replace the two values below, click Run. Do it ONCE.

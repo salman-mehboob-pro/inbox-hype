@@ -9,7 +9,7 @@ export default function NewEmailAccountPage() {
     <>
       <PageHeader
         title="Add email account"
-        description="We test sending (SMTP) and reading (IMAP) before saving."
+        description="Connect a sender address of your Postal server. We check it before saving."
       />
       <NewAccountForm />
     </>

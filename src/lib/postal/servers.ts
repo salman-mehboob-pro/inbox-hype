@@ -32,7 +32,6 @@ export async function ensurePostalServer(workspaceId: string, apiUrl: string): P
 // Postal. When the webhook reports it, the webhook works; when it comes back in
 // through the route, the route works (see hooks.ts).
 export async function sendSetupCheck(inbox: Tables<"email_accounts">): Promise<void> {
-  if (!inbox.postal_server_id) throw new Error("Not a Postal inbox");
   const check = randomUUID();
   const domain = inbox.email.split("@")[1]?.toLowerCase() || "inboxhype.local";
   const messageId = `<inboxhype-check-${check}@${domain}>`;

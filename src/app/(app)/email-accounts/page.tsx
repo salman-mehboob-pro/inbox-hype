@@ -4,7 +4,6 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PROVIDER_PRESETS, type Provider } from "@/lib/email/providers";
 import { timeAgo } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
@@ -19,7 +18,7 @@ export default async function EmailAccountsPage() {
   const { data: accounts, error } = await supabase
     .from("email_accounts")
     .select(
-      "id, email, from_name, provider, status, daily_limit, imap_host, last_tested_at, last_error, postal_server:postal_servers(route_ok_at)",
+      "id, email, from_name, status, daily_limit, last_tested_at, last_error, postal_server:postal_servers(api_url, route_ok_at)",
     )
     .eq("workspace_id", workspace.id)
     .order("created_at", { ascending: true });
@@ -48,7 +47,7 @@ export default async function EmailAccountsPage() {
           <div className="grid gap-1">
             <p className="font-medium">No email accounts yet</p>
             <p className="text-sm text-muted-foreground">
-              Connect a Gmail, Outlook or custom SMTP inbox to start sending.
+              Connect a sender address of your Postal server to start sending.
             </p>
           </div>
           {addButton}
@@ -59,7 +58,7 @@ export default async function EmailAccountsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
-                <TableHead className="hidden md:table-cell">Provider</TableHead>
+                <TableHead className="hidden md:table-cell">Postal server</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden sm:table-cell text-right">Daily limit</TableHead>
                 <TableHead className="hidden md:table-cell">Replies</TableHead>
@@ -84,20 +83,14 @@ export default async function EmailAccountsPage() {
                     )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {PROVIDER_PRESETS[a.provider as Provider]?.label ?? a.provider}
+                    {a.postal_server ? new URL(a.postal_server.api_url).host : "—"}
                   </TableCell>
                   <TableCell>
                     <AccountStatusBadge status={a.status} />
                   </TableCell>
                   <TableCell className="hidden sm:table-cell text-right tabular-nums">{a.daily_limit}</TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {a.imap_host
-                      ? "IMAP"
-                      : a.provider === "postal"
-                        ? a.postal_server?.route_ok_at
-                          ? "Postal route"
-                          : "Setup needed"
-                        : "Not read"}
+                    {a.postal_server?.route_ok_at ? "Postal route" : a.postal_server ? "Setup needed" : "—"}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground">
                     {timeAgo(a.last_tested_at)}

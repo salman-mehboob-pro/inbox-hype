@@ -25,7 +25,6 @@
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "html-to-text": "^10.0.1",
-    "imapflow": "^2.2.5",
     "lucide-react": "^1.52.0",
     "mailparser": "^3.9.36",
     "next": "16.3.8",

@@ -4,14 +4,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PROVIDER_PRESETS, type Provider } from "@/lib/email/providers";
 import { publicEnv } from "@/lib/env";
 import { timeAgo } from "@/lib/format";
 import { postalInboundUrl, postalWebhookUrl } from "@/lib/postal/core";
 import { createClient } from "@/lib/supabase/server";
 import { AccountActions } from "../account-actions";
 import { AccountStatusBadge } from "../status-badge";
-import { PasswordForm, SettingsForm, TestButton } from "./account-forms";
+import { ApiKeyForm, SettingsForm, TestButton } from "./account-forms";
 import { PostalSetup } from "./postal-setup";
 
 export const metadata: Metadata = { title: "Email account" };
@@ -29,32 +28,26 @@ export default async function EmailAccountPage({ params }: PageProps<"/email-acc
   if (error) throw error;
   if (!account) notFound();
 
-  const security = (secure: boolean) => (secure ? "SSL/TLS" : "STARTTLS");
-
-  // Postal inboxes send through the Postal API and need the one-time setup.
-  let postal: { apiUrl: string; inboundUrl: string; webhookUrl: string; server: Parameters<typeof PostalSetup>[0]["server"] } | null =
-    null;
-  if (account.provider === "postal" && account.postal_server_id) {
-    const { data: server, error: serverError } = await supabase
-      .from("postal_servers")
-      .select("api_url, hook_token, webhook_ok_at, route_ok_at, check_sent_at, warning, warning_at")
-      .eq("id", account.postal_server_id)
-      .single();
-    if (serverError) throw serverError;
-    const appUrl = publicEnv.NEXT_PUBLIC_APP_URL;
-    postal = {
-      apiUrl: server.api_url,
-      inboundUrl: postalInboundUrl(appUrl, server.hook_token),
-      webhookUrl: postalWebhookUrl(appUrl, server.hook_token),
-      server: {
-        webhookOkAt: server.webhook_ok_at,
-        routeOkAt: server.route_ok_at,
-        checkSentAt: server.check_sent_at,
-        warning: server.warning,
-        warningAt: server.warning_at,
-      },
-    };
-  }
+  // Inboxes send through the Postal API and need the one-time setup.
+  const { data: server, error: serverError } = await supabase
+    .from("postal_servers")
+    .select("api_url, hook_token, webhook_ok_at, route_ok_at, check_sent_at, warning, warning_at")
+    .eq("id", account.postal_server_id)
+    .single();
+  if (serverError) throw serverError;
+  const appUrl = publicEnv.NEXT_PUBLIC_APP_URL;
+  const postal = {
+    apiUrl: server.api_url,
+    inboundUrl: postalInboundUrl(appUrl, server.hook_token),
+    webhookUrl: postalWebhookUrl(appUrl, server.hook_token),
+    server: {
+      webhookOkAt: server.webhook_ok_at,
+      routeOkAt: server.route_ok_at,
+      checkSentAt: server.check_sent_at,
+      warning: server.warning,
+      warningAt: server.warning_at,
+    },
+  };
   const isLocalUrl = /\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(publicEnv.NEXT_PUBLIC_APP_URL);
 
   return (
@@ -85,10 +78,7 @@ export default async function EmailAccountPage({ params }: PageProps<"/email-acc
         <Card>
           <CardHeader>
             <CardTitle>Connection</CardTitle>
-            <CardDescription>
-              {PROVIDER_PRESETS[account.provider as Provider]?.label ?? account.provider} · last tested{" "}
-              {timeAgo(account.last_tested_at)}
-            </CardDescription>
+            <CardDescription>Postal (API) · last tested {timeAgo(account.last_tested_at)}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             {account.status === "error" && account.last_error && (
@@ -96,46 +86,30 @@ export default async function EmailAccountPage({ params }: PageProps<"/email-acc
                 {account.last_error}
               </p>
             )}
-            {postal ? (
-              <dl className="grid gap-2 text-sm sm:grid-cols-[140px_1fr]">
-                <dt className="text-muted-foreground">Sending</dt>
-                <dd className="break-all">Postal API · {postal.apiUrl}</dd>
-                <dt className="text-muted-foreground">Replies</dt>
-                <dd>{postal.server.routeOkAt ? "Postal reply route (working)" : "Postal reply route (not confirmed yet)"}</dd>
-              </dl>
-            ) : (
-              <dl className="grid gap-2 text-sm sm:grid-cols-[140px_1fr]">
-                <dt className="text-muted-foreground">Sending (SMTP)</dt>
-                <dd className="break-all">
-                  {account.smtp_host}:{account.smtp_port} · {security(account.smtp_secure)} ·{" "}
-                  {account.smtp_username}
-                </dd>
-                <dt className="text-muted-foreground">Replies (IMAP)</dt>
-                <dd className="break-all">
-                  {account.imap_host
-                    ? `${account.imap_host}:${account.imap_port} · ${security(account.imap_secure)} · ${account.imap_username}`
-                    : "Not read (no IMAP)"}
-                </dd>
-              </dl>
-            )}
+            <dl className="grid gap-2 text-sm sm:grid-cols-[140px_1fr]">
+              <dt className="text-muted-foreground">Sending</dt>
+              <dd className="break-all">Postal API · {postal.apiUrl}</dd>
+              <dt className="text-muted-foreground">Replies</dt>
+              <dd>
+                {postal.server.routeOkAt ? "Postal reply route (working)" : "Postal reply route (not confirmed yet)"}
+              </dd>
+            </dl>
             <TestButton id={account.id} />
             <p className="text-xs text-muted-foreground">
-              To change the server or email address, remove this account and add it again.
+              To change the Postal server or the email address, remove this account and add it again.
             </p>
           </CardContent>
         </Card>
 
-        {postal && (
-          <PostalSetup
-            accountId={account.id}
-            email={account.email}
-            inboundUrl={postal.inboundUrl}
-            webhookUrl={postal.webhookUrl}
-            isLocalUrl={isLocalUrl}
-            server={postal.server}
-            renderedAt={new Date().getTime()}
-          />
-        )}
+        <PostalSetup
+          accountId={account.id}
+          email={account.email}
+          inboundUrl={postal.inboundUrl}
+          webhookUrl={postal.webhookUrl}
+          isLocalUrl={isLocalUrl}
+          server={postal.server}
+          renderedAt={new Date().getTime()}
+        />
 
         <SettingsForm
           id={account.id}
@@ -146,7 +120,7 @@ export default async function EmailAccountPage({ params }: PageProps<"/email-acc
           }}
         />
 
-        <PasswordForm id={account.id} hasImap={Boolean(account.imap_host)} provider={account.provider} />
+        <ApiKeyForm id={account.id} />
       </div>
     </>
   );

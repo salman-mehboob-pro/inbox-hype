@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { ConnectionTestResult } from "@/lib/email/connection-test";
-import { testEmailAccount, updateEmailAccountPassword, updateEmailAccountSettings } from "../actions";
+import type { CheckResult } from "@/lib/email/connection-test";
+import { testEmailAccount, updateEmailAccountApiKey, updateEmailAccountSettings } from "../actions";
 import { ConnectionResult } from "../connection-result";
 
 export function TestButton({ id }: { id: string }) {
   const [pending, startTransition] = useTransition();
-  const [test, setTest] = useState<ConnectionTestResult>();
+  const [test, setTest] = useState<CheckResult>();
 
   return (
     <div className="grid gap-3">
@@ -116,21 +116,17 @@ export function SettingsForm({ id, initial }: { id: string; initial: Settings })
   );
 }
 
-export function PasswordForm({ id, hasImap, provider }: { id: string; hasImap: boolean; provider: string }) {
-  const [password, setPassword] = useState("");
-  const [imapPassword, setImapPassword] = useState("");
+export function ApiKeyForm({ id }: { id: string }) {
+  const [apiKey, setApiKey] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[] | undefined>>({});
-  const [test, setTest] = useState<ConnectionTestResult>();
+  const [test, setTest] = useState<CheckResult>();
   const [pending, startTransition] = useTransition();
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{provider === "postal" ? "Update API key" : "Update password"}</CardTitle>
-        <CardDescription>
-          Use this if you made a new {provider === "postal" ? "Postal API credential" : "app password"}. We test it
-          before saving.
-        </CardDescription>
+        <CardTitle>Update API key</CardTitle>
+        <CardDescription>Use this if you made a new Postal API credential. We test it before saving.</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -140,15 +136,11 @@ export function PasswordForm({ id, hasImap, provider }: { id: string; hasImap: b
             setFieldErrors({});
             setTest(undefined);
             startTransition(async () => {
-              const result = await updateEmailAccountPassword(id, {
-                password,
-                imapPassword: imapPassword || undefined,
-              });
+              const result = await updateEmailAccountApiKey(id, { apiKey });
               setTest(result.test);
               if (result.ok) {
-                toast.success("Password updated");
-                setPassword("");
-                setImapPassword("");
+                toast.success("API key updated");
+                setApiKey("");
               } else {
                 setFieldErrors(result.fieldErrors ?? {});
                 if (!result.test && result.error) toast.error(result.error);
@@ -157,31 +149,19 @@ export function PasswordForm({ id, hasImap, provider }: { id: string; hasImap: b
           }}
         >
           <Field
-            label={provider === "postal" ? "New API key" : "New password"}
-            name="password"
+            label="New API key"
+            name="apiKey"
             type="password"
             autoComplete="new-password"
             required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            errors={fieldErrors.password}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            errors={fieldErrors.apiKey}
           />
-          {hasImap && (
-            <Field
-              label="IMAP password (only if different)"
-              name="imapPassword"
-              type="password"
-              autoComplete="new-password"
-              placeholder="Same as above"
-              value={imapPassword}
-              onChange={(e) => setImapPassword(e.target.value)}
-              errors={fieldErrors.imapPassword}
-            />
-          )}
           {test && <ConnectionResult test={test} />}
-          <Button type="submit" className="justify-self-start" disabled={pending || !password}>
+          <Button type="submit" className="justify-self-start" disabled={pending || !apiKey}>
             {pending && <Loader2Icon className="animate-spin" />}
-            {pending ? "Testing…" : provider === "postal" ? "Test & save API key" : "Test & save password"}
+            {pending ? "Testing…" : "Test & save API key"}
           </Button>
         </form>
       </CardContent>

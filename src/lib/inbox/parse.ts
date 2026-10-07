@@ -16,7 +16,7 @@ export function extractMessageIds(...values: Array<string | string[] | null | un
   return [...seen];
 }
 
-// A block of raw header lines (as returned by IMAP) -> { "header-name": "value" }.
+// A block of raw header lines (the top of a raw email) -> { "header-name": "value" }.
 // Names in lower case, folded lines joined, a repeated header keeps its first value.
 export function parseHeaderBlock(block: string | Uint8Array | null | undefined): Record<string, string> {
   const text = typeof block === "string" ? block : block ? new TextDecoder().decode(block) : "";

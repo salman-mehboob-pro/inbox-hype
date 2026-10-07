@@ -5,9 +5,9 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import type { Json, Tables } from "@/lib/supabase/database.types";
 import { classifyInbound, extractMessageIds, parseHeaderBlock, type InboundKind } from "./parse";
 
-// Records one incoming email (a whole raw message) if it belongs to one of our
-// emails: a reply, an out-of-office, or a bounce report. Used by the IMAP sync
-// and by the Postal route. Mail from people we never emailed is not stored.
+// Records one incoming email (a whole raw message, from the Postal route) if it
+// belongs to one of our emails: a reply, an out-of-office, or a bounce report.
+// Mail from people we never emailed is not stored.
 
 type Admin = ReturnType<typeof createAdminClient>;
 type SentRef = Pick<
@@ -27,15 +27,14 @@ export function rawHeaderBlock(raw: Buffer): string {
 export async function ingestRawMessage(
   admin: Admin,
   args: {
-    // The inboxes the message may belong to (one for IMAP; all inboxes of a Postal server).
+    // The inboxes the message may belong to (all inboxes of the Postal server).
     accountIds: string[];
     raw: Buffer;
     // Used when the message has no Message-ID header (it must be unique per inbox).
     fallbackMessageId: string;
     // The address it was delivered to, when nothing in the message says it.
     defaultTo: string | null;
-    imapUid?: number | null;
-    source: "imap" | "postal_route";
+    source: "postal_route";
   },
 ): Promise<InboundKind> {
   if (args.accountIds.length === 0) return "other";
@@ -79,7 +78,6 @@ export async function ingestRawMessage(
     subject,
     text_body: parsed.text ?? null,
     html_body: typeof parsed.html === "string" ? sanitizeEmailHtml(parsed.html) : null,
-    imap_uid: args.imapUid ?? null,
     received_at: (parsed.date ?? new Date()).toISOString(),
     source: args.source,
   } satisfies Json;
@@ -100,7 +98,7 @@ export async function ingestRawMessage(
 //   1. By message id (our id in In-Reply-To / References, or quoted in a bounce).
 //   2. Otherwise by the lead's address: its most recent email from these inboxes.
 //      Needed because some servers replace our Message-ID with their own.
-export async function findSentMessage(
+async function findSentMessage(
   admin: Admin,
   accountIds: string[],
   ids: string[],

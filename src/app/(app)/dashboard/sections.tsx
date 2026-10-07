@@ -217,7 +217,7 @@ export function CampaignsCard({ campaigns, total }: { campaigns: DashboardCampai
 
 function inboxProblem(inbox: DashboardInbox): string | null {
   if (inbox.status === "error") return inbox.last_error || "This inbox has an error and is not sending.";
-  if (inbox.status === "active" && !inbox.reads_replies) return "Replies are not read for this inbox (turn on IMAP, or finish the Postal setup on the inbox page).";
+  if (inbox.status === "active" && !inbox.reads_replies) return "Replies can't arrive yet: finish the Postal setup on the inbox page.";
   if (inbox.status === "active" && inbox.daily_limit > 0 && inbox.sent_today >= inbox.daily_limit) {
     return "Daily limit reached. Sending continues tomorrow.";
   }

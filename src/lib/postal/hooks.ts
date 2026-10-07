@@ -151,7 +151,7 @@ async function setDelivery(
   if (error) throw error;
 }
 
-// A bounce reported by Postal: same as a bounce found over IMAP (lead bounced,
+// A bounce reported by Postal: same as a bounce report from the route (lead bounced,
 // address suppressed, shown in the Unibox "Bounced" tab).
 async function recordBounce(admin: Admin, server: Server, sent: SentRow, detail: string, key: string) {
   if (!sent.email_account_id) return;
@@ -166,7 +166,6 @@ async function recordBounce(admin: Admin, server: Server, sent: SentRow, detail:
     subject: `Delivery failed: ${sent.to_email}`,
     text_body: `Postal could not deliver the email to ${sent.to_email}.\n\n${detail}`,
     html_body: null,
-    imap_uid: null,
     received_at: new Date().toISOString(),
     source: "postal_webhook",
   } satisfies Json;

@@ -4,7 +4,7 @@ import { isIP } from "node:net";
 import { resolvePublicHost } from "@/lib/email/host-guard";
 import { PostalApiError, readPostalAnswer, readSendResult } from "./core";
 
-// Talks to a Postal server's HTTP API. HTTPS only, and like SMTP/IMAP the host
+// Talks to a Postal server's HTTP API. HTTPS only, and the host
 // must resolve to a public address (we connect to the address we checked).
 
 const TIMEOUT_MS = 30_000;
@@ -81,7 +81,7 @@ async function postalRequest(config: PostalConfig, path: string, body: unknown):
   });
 }
 
-// Sends one ready-made email (the whole raw message, like SMTP would).
+// Sends one ready-made email (the whole raw message, headers + body).
 export async function postalSendRaw(
   config: PostalConfig,
   args: { mailFrom: string; rcptTo: string; raw: Buffer },

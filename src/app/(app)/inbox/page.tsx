@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { CATEGORY_KEYS } from "./categories";
-import { CheckRepliesButton, InboxToolbar } from "./inbox-toolbar";
+import { InboxToolbar } from "./inbox-toolbar";
 import { Thread } from "./thread";
 import { ThreadList, type ThreadRow } from "./thread-list";
 
@@ -57,11 +57,12 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
       .eq("direction", "inbound")
       .eq("is_read", false)
       .is("deleted_at", null),
+    // Postal servers whose reply route is confirmed (replies can arrive).
     supabase
-      .from("email_accounts")
+      .from("postal_servers")
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", workspace.id)
-      .not("imap_host", "is", null),
+      .not("route_ok_at", "is", null),
   ]);
   if (list.error) throw list.error;
   if (unread.error) throw unread.error;
@@ -108,7 +109,6 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
       <PageHeader
         title="Unibox"
         description="All replies from all your inboxes in one place."
-        actions={readable.count ? <CheckRepliesButton /> : undefined}
       />
 
       {isEmpty ? (
@@ -120,8 +120,8 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
             <p className="font-medium">No replies yet</p>
             <p className="text-sm text-muted-foreground">
               {readable.count
-                ? "When a lead answers one of your campaign emails, it shows up here within a couple of minutes. Bounces and out-of-office answers appear here too."
-                : "None of your inboxes can read replies yet. Add an inbox with reading (IMAP) turned on."}
+                ? "When a lead answers one of your campaign emails, it shows up here right away. Bounces and out-of-office answers appear here too."
+                : "Replies can't arrive yet. Open your Postal inbox in Email accounts and finish the one-time Postal setup."}
             </p>
           </div>
         </div>
