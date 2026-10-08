@@ -1,16 +1,17 @@
 "use client";
 
-import { Loader2Icon, TriangleAlertIcon } from "lucide-react";
+import { EyeIcon, EyeOffIcon, Loader2Icon, TriangleAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { EmailEditor, type BodyFormat } from "@/components/email-editor/email-editor";
+import { EmailPreview } from "@/components/email-editor/email-preview";
 import { VariableMenu } from "@/components/email-editor/variable-menu";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { lintTemplate, looksLikeHtml, textToHtml } from "@/lib/email/template";
+import { lintTemplate, looksLikeHtml, textToHtml, type TemplateLead, type TemplateSender } from "@/lib/email/template";
 import { createTemplate, saveTemplate } from "./actions";
 
 type Values = { name: string; subject: string; body: string; body_format: BodyFormat };
@@ -19,11 +20,15 @@ export function TemplateForm({
   id,
   initial,
   customKeys,
+  previewLead,
+  sender,
 }: {
   // No id = a new template.
   id?: string;
   initial?: { name: string; subject: string; body: string; body_format: string };
   customKeys: string[];
+  previewLead: TemplateLead | null;
+  sender: TemplateSender;
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Values>(() => {
@@ -38,6 +43,7 @@ export function TemplateForm({
   });
   const [saved, setSaved] = useState(() => JSON.stringify(values));
   const [nameError, setNameError] = useState<string>();
+  const [previewing, setPreviewing] = useState(false);
   const [pending, startTransition] = useTransition();
   const subjectRef = useRef<HTMLInputElement>(null);
 
@@ -76,6 +82,15 @@ export function TemplateForm({
   return (
     <form onSubmit={save} className="grid max-w-4xl gap-4">
       <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Email</CardTitle>
+          <CardAction>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewing((p) => !p)}>
+              {previewing ? <EyeOffIcon /> : <EyeIcon />}
+              {previewing ? "Hide preview" : "Preview"}
+            </Button>
+          </CardAction>
+        </CardHeader>
         <CardContent className="grid gap-4">
           <div className="grid gap-1.5">
             <Label htmlFor="template-name">Template name</Label>
@@ -131,6 +146,17 @@ export function TemplateForm({
                 </li>
               ))}
             </ul>
+          )}
+          {previewing && (
+            <EmailPreview
+              subject={values.subject}
+              body={values.body}
+              lead={previewLead}
+              sender={sender}
+              seed="1"
+              title="Template preview"
+              emptySubject="(empty: replies in the same thread)"
+            />
           )}
         </CardContent>
       </Card>

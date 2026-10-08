@@ -1,19 +1,15 @@
 import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { getTemplateEditorData } from "../editor-data";
 import { TemplateForm } from "../template-form";
 
 export const metadata: Metadata = { title: "New template" };
 
 export default async function NewTemplatePage() {
   const { workspace } = await getCurrentWorkspace();
-  const supabase = await createClient();
-  const { data: customKeys, error } = await supabase.rpc("workspace_custom_field_keys", {
-    p_workspace_id: workspace.id,
-  });
-  if (error) throw error;
+  const editorData = await getTemplateEditorData(workspace.id);
 
   return (
     <>
@@ -27,7 +23,7 @@ export default async function NewTemplatePage() {
         </Link>
         <h1 className="text-xl font-semibold tracking-tight">New template</h1>
       </div>
-      <TemplateForm customKeys={(customKeys ?? []).map((k) => k.key)} />
+      <TemplateForm {...editorData} />
     </>
   );
 }

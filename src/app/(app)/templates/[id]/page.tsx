@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { getTemplateEditorData } from "../editor-data";
 import { TemplateForm } from "../template-form";
 
 export const metadata: Metadata = { title: "Template" };
@@ -15,12 +16,11 @@ export default async function TemplatePage({ params }: PageProps<"/templates/[id
 
   const { workspace } = await getCurrentWorkspace();
   const supabase = await createClient();
-  const [template, customKeys] = await Promise.all([
+  const [template, editorData] = await Promise.all([
     supabase.from("email_templates").select("id, name, subject, body, body_format").eq("id", id).maybeSingle(),
-    supabase.rpc("workspace_custom_field_keys", { p_workspace_id: workspace.id }),
+    getTemplateEditorData(workspace.id),
   ]);
   if (template.error) throw template.error;
-  if (customKeys.error) throw customKeys.error;
   if (!template.data) notFound();
 
   return (
@@ -39,7 +39,7 @@ export default async function TemplatePage({ params }: PageProps<"/templates/[id
         key={template.data.id}
         id={template.data.id}
         initial={template.data}
-        customKeys={(customKeys.data ?? []).map((k) => k.key)}
+        {...editorData}
       />
     </>
   );
