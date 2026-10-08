@@ -233,6 +233,47 @@ export type Database = {
           },
         ]
       }
+      email_templates: {
+        Row: {
+          body: string
+          body_format: string
+          created_at: string
+          id: string
+          name: string
+          subject: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string
+          body_format?: string
+          created_at?: string
+          id?: string
+          name: string
+          subject?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string
+          body_format?: string
+          created_at?: string
+          id?: string
+          name?: string
+          subject?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_accounts: {
         Row: {
           created_at: string
@@ -1108,6 +1149,7 @@ export type Database = {
       switch_workspace: { Args: { p_workspace_id: string }; Returns: undefined }
       create_workspace: { Args: { p_name: string }; Returns: string }
       delete_workspace: { Args: { p_workspace_id: string }; Returns: undefined }
+      duplicate_campaign: { Args: { p_campaign_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

@@ -294,6 +294,22 @@ export async function pauseCampaign(id: string): Promise<CampaignActionResult> {
   return { ok: true };
 }
 
+// Copies settings, sequence and inboxes (not leads or history); the copy is a draft.
+export async function duplicateCampaign(id: string): Promise<CampaignActionResult> {
+  const campaign = await getOwnedCampaign(id);
+  if (!campaign) return { ok: false, error: "Campaign not found." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("duplicate_campaign", { p_campaign_id: campaign.id });
+  if (error) {
+    logger.error("duplicate campaign failed", { error, campaignId: campaign.id });
+    return { ok: false, error: GENERIC_ERROR };
+  }
+  logger.info("campaign duplicated", { campaignId: campaign.id, newCampaignId: data });
+  revalidatePath("/campaigns");
+  return { ok: true, id: data };
+}
+
 export async function deleteCampaign(id: string): Promise<CampaignActionResult> {
   const campaign = await getOwnedCampaign(id);
   if (!campaign) return { ok: false, error: "Campaign not found." };

@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { timeAgo } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { CampaignActions } from "./campaign-actions";
 import { NewCampaignButton } from "./new-campaign-button";
 import { CampaignStatusBadge } from "./status-badge";
 
@@ -57,6 +58,9 @@ export default async function CampaignsPage() {
                 <TableHead className="hidden text-right sm:table-cell">Steps</TableHead>
                 <TableHead className="hidden text-right md:table-cell">Inboxes</TableHead>
                 <TableHead className="hidden lg:table-cell">Created</TableHead>
+                <TableHead className="w-12">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -78,6 +82,9 @@ export default async function CampaignsPage() {
                     {count(c.campaign_email_accounts)}
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground lg:table-cell">{timeAgo(c.created_at)}</TableCell>
+                  <TableCell className="text-right">
+                    <CampaignActions id={c.id} name={c.name} status={c.status} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

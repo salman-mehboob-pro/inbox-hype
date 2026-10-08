@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FileTextIcon,
   InboxIcon,
   LayoutDashboardIcon,
   MailIcon,
@@ -29,6 +30,7 @@ import { WorkspaceSwitcher, type WorkspaceOption } from "./workspace-switcher";
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
   { href: "/campaigns", label: "Campaigns", icon: MegaphoneIcon },
+  { href: "/templates", label: "Templates", icon: FileTextIcon },
   { href: "/leads", label: "Leads", icon: UsersIcon },
   { href: "/email-accounts", label: "Email accounts", icon: MailIcon },
   { href: "/inbox", label: "Unibox", icon: InboxIcon },

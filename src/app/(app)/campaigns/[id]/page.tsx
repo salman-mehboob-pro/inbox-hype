@@ -74,7 +74,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
   if (stats.error) throw stats.error;
   if (activity.error) throw activity.error;
 
-  const [steps, accounts, chosen, campaignLeads, tags, customKeys, sampleLead, ...statusCounts] = await Promise.all([
+  const [steps, accounts, chosen, campaignLeads, tags, customKeys, sampleLead, templates, ...statusCounts] = await Promise.all([
     supabase
       .from("sequence_steps")
       .select("id, position, delay_days, delay_hours, subject, body, body_format")
@@ -105,6 +105,11 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
       .order("created_at")
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("email_templates")
+      .select("id, name, subject, body, body_format")
+      .eq("workspace_id", workspace.id)
+      .order("name"),
     ...LEAD_STATUSES.map((s) =>
       supabase
         .from("campaign_leads")
@@ -113,7 +118,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
         .eq("status", s),
     ),
   ]);
-  for (const r of [steps, accounts, chosen, campaignLeads, tags, customKeys, sampleLead, ...statusCounts]) {
+  for (const r of [steps, accounts, chosen, campaignLeads, tags, customKeys, sampleLead, templates, ...statusCounts]) {
     if (r.error) throw r.error;
   }
 
@@ -183,6 +188,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
                 : null
             }
             sender={firstSender ? { name: firstSender.from_name, email: firstSender.email } : {}}
+            initialTemplates={templates.data ?? []}
           />
         }
         leads={

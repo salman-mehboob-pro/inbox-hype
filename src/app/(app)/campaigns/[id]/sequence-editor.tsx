@@ -27,8 +27,10 @@ import {
   type TemplateLead,
   type TemplateSender,
 } from "@/lib/email/template";
+import type { TemplateOption } from "../../templates/schema";
 import { saveSequence } from "../actions";
 import { MAX_STEPS } from "../schema";
+import { StepTemplateMenu } from "./step-template-menu";
 
 type Step = {
   key: string;
@@ -53,11 +55,15 @@ type InitialStep = {
   body_format: string;
 };
 
+// Bodies saved before the rich editor were plain text.
+function normalizeBody(body: string, bodyFormat: string): { body: string; body_format: BodyFormat } {
+  const format: BodyFormat = bodyFormat === "html" ? "html" : "rich";
+  return { body: format === "rich" && body && !looksLikeHtml(body) ? textToHtml(body) : body, body_format: format };
+}
+
 function toState(rows: InitialStep[]): Step[] {
   return rows.map((s) => {
-    const format: BodyFormat = s.body_format === "html" ? "html" : "rich";
-    // Bodies saved before the rich editor were plain text.
-    const body = format === "rich" && s.body && !looksLikeHtml(s.body) ? textToHtml(s.body) : s.body;
+    const { body, body_format: format } = normalizeBody(s.body, s.body_format);
     return {
       key: s.id,
       id: s.id,
@@ -76,14 +82,17 @@ export function SequenceEditor({
   customKeys,
   previewLead,
   sender,
+  initialTemplates,
 }: {
   campaignId: string;
   initialSteps: InitialStep[];
   customKeys: string[];
   previewLead: TemplateLead | null;
   sender: TemplateSender;
+  initialTemplates: TemplateOption[];
 }) {
   const [steps, setSteps] = useState<Step[]>(() => toState(initialSteps));
+  const [templates, setTemplates] = useState(initialTemplates);
   const [saved, setSaved] = useState(() => JSON.stringify(toState(initialSteps)));
   const [previewing, setPreviewing] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
@@ -195,6 +204,15 @@ export function SequenceEditor({
                   {i === 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">sends first</span>}
                 </CardTitle>
                 <CardAction className="flex items-center gap-1">
+                  <StepTemplateMenu
+                    stepNumber={i + 1}
+                    step={{ subject: step.subject, body: step.body, body_format: step.body_format }}
+                    templates={templates}
+                    onApply={(t) => update(step.key, { subject: t.subject, ...normalizeBody(t.body, t.body_format) })}
+                    onSaved={(t) =>
+                      setTemplates((prev) => [...prev, t].sort((a, b) => a.name.localeCompare(b.name)))
+                    }
+                  />
                   <Button
                     variant="ghost"
                     size="sm"
