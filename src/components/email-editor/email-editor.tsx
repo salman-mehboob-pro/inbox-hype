@@ -8,6 +8,7 @@ import StarterKit from "@tiptap/starter-kit";
 import {
   BoldIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   CodeXmlIcon,
   ImageIcon,
   ItalicIcon,
@@ -43,6 +44,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { decodeHtmlFile, hasDesign } from "@/lib/email/html-file";
 import { cn } from "@/lib/utils";
 import { VariableMenu } from "./variable-menu";
 
@@ -84,6 +86,11 @@ export function EmailEditor({
   const fileRef = useRef<HTMLInputElement>(null);
   const htmlRef = useRef<HTMLTextAreaElement>(null);
   const [dialog, setDialog] = useState<"link" | "image" | null>(null);
+  const [codeOpen, setCodeOpen] = useState(true);
+  const [confirmText, setConfirmText] = useState(false);
+  // The HTML from before a switch to Text, so switching back without editing
+  // gives it back exactly.
+  const htmlBackup = useRef<{ html: string; rich: string } | null>(null);
   // The editor is created once; always call the latest onChange.
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -129,14 +136,21 @@ export function EmailEditor({
     if (current !== value) editor.commands.setContent(value, { emitUpdate: false });
   }, [editor, format, value]);
 
-  function switchTo(next: BodyFormat) {
+  function switchTo(next: BodyFormat, confirmed = false) {
     if (next === format) return;
     if (next === "html") {
-      onChange(editor && !editor.isEmpty ? editor.getHTML() : value, "html");
+      const current = editor && !editor.isEmpty ? editor.getHTML() : value;
+      const backup = htmlBackup.current;
+      htmlBackup.current = null;
+      setCodeOpen(true);
+      onChange(backup && backup.rich === value ? backup.html : current, "html");
     } else {
+      if (!confirmed && hasDesign(value)) return setConfirmText(true);
       // The editor only keeps what it understands (text, links, lists, …).
       editor?.commands.setContent(value, { emitUpdate: false });
-      onChange(editor && !editor.isEmpty ? editor.getHTML() : "", "rich");
+      const rich = editor && !editor.isEmpty ? editor.getHTML() : "";
+      htmlBackup.current = value.trim() ? { html: value, rich } : null;
+      onChange(rich, "rich");
     }
   }
 
@@ -160,7 +174,9 @@ export function EmailEditor({
     if (!file) return;
     if (!/\.html?$/i.test(file.name)) return toast.error("Choose an .html file.");
     if (file.size > MAX_IMPORT_BYTES) return toast.error("The file is larger than 500 KB.");
-    onChange(await file.text(), "html");
+    htmlBackup.current = null;
+    setCodeOpen(true);
+    onChange(decodeHtmlFile(await file.arrayBuffer()), "html");
     toast.success(`${file.name} imported`);
   }
 
@@ -206,22 +222,64 @@ export function EmailEditor({
             <EditorContent editor={editor} />
           </>
         ) : (
-          <Textarea
-            ref={htmlRef}
-            id={id}
-            aria-label="Email HTML"
-            rows={14}
-            spellCheck={false}
-            className="rounded-none border-0 font-mono text-xs focus-visible:ring-0"
-            placeholder="<p>Paste your HTML here. Variables like {{firstName}} work too.</p>"
-            value={value}
-            onChange={(e) => onChange(e.target.value, "html")}
-          />
+          <>
+            <button
+              type="button"
+              aria-expanded={codeOpen}
+              onClick={() => setCodeOpen((o) => !o)}
+              className="flex w-full items-center gap-1.5 border-b bg-muted/40 px-2.5 py-1.5 text-left text-xs text-muted-foreground hover:text-foreground"
+            >
+              <ChevronRightIcon className={cn("size-3.5 transition-transform", codeOpen && "rotate-90")} />
+              {codeOpen ? "Hide code" : "Show code"}
+              <span className="ml-auto tabular-nums">
+                {value ? `${value.split("\n").length.toLocaleString()} lines · ${formatSize(value.length)}` : "empty"}
+              </span>
+            </button>
+            {codeOpen && (
+              <Textarea
+                ref={htmlRef}
+                id={id}
+                aria-label="Email HTML"
+                spellCheck={false}
+                // Fixed height: long HTML scrolls inside the box, not the page.
+                className="field-sizing-fixed h-80 resize-y rounded-none border-0 font-mono text-xs focus-visible:ring-0"
+                placeholder="<p>Paste your HTML here. Variables like {{firstName}} work too.</p>"
+                value={value}
+                onChange={(e) => onChange(e.target.value, "html")}
+              />
+            )}
+          </>
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Switching modes converts the content right away; switching back won&apos;t restore it exactly.
+        {format === "html"
+          ? "Use Preview to see the email. Text mode keeps only the text, not the design."
+          : "Text mode is a simple editor. Use HTML paste for designed emails."}
       </p>
+
+      <Dialog open={confirmText} onOpenChange={setConfirmText}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Switch to Text mode?</DialogTitle>
+            <DialogDescription>
+              Text mode is a simple editor. It can&apos;t keep this email&apos;s design (layout, colors, styles): only
+              the text stays, as plain paragraphs. If you switch back to HTML without changing anything, your
+              original HTML comes back.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Keep HTML</DialogClose>
+            <Button
+              onClick={() => {
+                setConfirmText(false);
+                switchTo("rich", true);
+              }}
+            >
+              Switch to Text
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {editor && (
         <>
@@ -231,6 +289,10 @@ export function EmailEditor({
       )}
     </div>
   );
+}
+
+function formatSize(chars: number): string {
+  return chars < 1024 ? `${chars} B` : `${(chars / 1024).toFixed(1)} KB`;
 }
 
 function ModeButton({

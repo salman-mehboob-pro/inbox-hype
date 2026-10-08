@@ -3,6 +3,7 @@
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  ChevronRightIcon,
   ClockIcon,
   EyeIcon,
   EyeOffIcon,
@@ -95,6 +96,8 @@ export function SequenceEditor({
   const [templates, setTemplates] = useState(initialTemplates);
   const [saved, setSaved] = useState(() => JSON.stringify(toState(initialSteps)));
   const [previewing, setPreviewing] = useState<Set<string>>(new Set());
+  // Folded steps show one line, so long emails don't make the page huge.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
   const subjectRefs = useRef(new Map<string, HTMLInputElement>());
 
@@ -165,6 +168,7 @@ export function SequenceEditor({
       {steps.map((step, i) => {
         const problems = [...lintTemplate(step.subject), ...lintTemplate(step.body)];
         const isPreview = previewing.has(step.key);
+        const isCollapsed = collapsed.has(step.key);
         return (
           <div key={step.key} className="grid gap-2">
             {i > 0 && (
@@ -199,9 +203,34 @@ export function SequenceEditor({
             )}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">
-                  Step {i + 1}
-                  {i === 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">sends first</span>}
+                <CardTitle className="min-w-0 text-base">
+                  <button
+                    type="button"
+                    aria-expanded={!isCollapsed}
+                    aria-label={isCollapsed ? `Expand step ${i + 1}` : `Collapse step ${i + 1}`}
+                    onClick={() =>
+                      setCollapsed((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(step.key)) next.delete(step.key);
+                        else next.add(step.key);
+                        return next;
+                      })
+                    }
+                    className="flex max-w-full items-center gap-1.5 text-left"
+                  >
+                    <ChevronRightIcon
+                      className={`size-4 shrink-0 text-muted-foreground transition-transform ${isCollapsed ? "" : "rotate-90"}`}
+                    />
+                    <span className="shrink-0">Step {i + 1}</span>
+                    {i === 0 && !isCollapsed && (
+                      <span className="text-xs font-normal text-muted-foreground">sends first</span>
+                    )}
+                    {isCollapsed && (
+                      <span className="truncate text-sm font-normal text-muted-foreground">
+                        {step.subject.trim() || (i > 0 ? "(reply in the same thread)" : "(no subject)")}
+                      </span>
+                    )}
+                  </button>
                 </CardTitle>
                 <CardAction className="flex items-center gap-1">
                   <StepTemplateMenu
@@ -258,7 +287,8 @@ export function SequenceEditor({
                   </Button>
                 </CardAction>
               </CardHeader>
-              <CardContent className="grid gap-4">
+              {/* Hidden, not removed, so the editor keeps its state while folded. */}
+              <CardContent className={isCollapsed ? "hidden" : "grid gap-4"}>
                 <div className="grid gap-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <Label htmlFor={`${step.key}-subject`}>Subject</Label>

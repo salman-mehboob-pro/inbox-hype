@@ -1,6 +1,7 @@
 "use client";
 
 import { TriangleAlertIcon } from "lucide-react";
+import { previewDocument } from "@/lib/email/html-file";
 import { render, type TemplateLead, type TemplateSender } from "@/lib/email/template";
 
 // Live preview of an email for one lead (variables + spin text filled in).
@@ -31,10 +32,7 @@ export function EmailPreview({
   const renderedBody = render(body, sample, sender, `${fullSeed}:body`, { html: true });
   const missing = [...new Set([...renderedSubject.missing, ...renderedBody.missing])];
 
-  const doc = `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>
-    body{font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111;margin:12px;}
-    p{margin:0 0 .75em} img{max-width:100%;height:auto} blockquote{border-left:3px solid #ddd;margin:0 0 .75em;padding-left:.75em;color:#555}
-  </style></head><body>${renderedBody.text}</body></html>`;
+  const doc = previewDocument(renderedBody.text);
 
   return (
     <div className="grid gap-2 rounded-lg border bg-muted/30 p-3">
@@ -48,7 +46,7 @@ export function EmailPreview({
           {renderedSubject.text || <em className="text-muted-foreground">{emptySubject}</em>}
         </span>
       </p>
-      <iframe title={title} sandbox="allow-popups" srcDoc={doc} className="h-72 w-full rounded-md border bg-white" />
+      <iframe title={title} sandbox="allow-popups" srcDoc={doc} className="h-96 w-full rounded-md border bg-white" />
       {missing.length > 0 && (
         <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400">
           <TriangleAlertIcon className="size-3.5" />
