@@ -17,7 +17,17 @@ import { Input } from "@/components/ui/input";
 import { pauseCampaign, renameCampaign, startCampaign } from "../actions";
 import { CampaignStatusBadge } from "../status-badge";
 
-export function CampaignHeader({ id, name, status }: { id: string; name: string; status: string }) {
+export function CampaignHeader({
+  id,
+  name,
+  status,
+  pausedReason,
+}: {
+  id: string;
+  name: string;
+  status: string;
+  pausedReason: string | null;
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
   const [problems, setProblems] = useState<string[]>([]);
@@ -101,6 +111,19 @@ export function CampaignHeader({ id, name, status }: { id: string; name: string;
           {status === "paused" ? "Resume" : "Start campaign"}
         </Button>
       ) : null}
+
+      {pausedReason && (
+        <p
+          role="status"
+          className="flex basis-full items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
+        >
+          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-amber-600" />
+          <span>
+            {pausedReason} Check the bounced leads (Unibox → Bounced), then press Resume. Only emails sent after you
+            resume count toward the limit.
+          </span>
+        </p>
+      )}
 
       <Dialog open={problems.length > 0} onOpenChange={(o) => !o && setProblems([])}>
         <DialogContent>

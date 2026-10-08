@@ -18,9 +18,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { AccountStatusBadge } from "../../email-accounts/status-badge";
 import { deleteCampaign, saveOptions } from "../actions";
+import { BOUNCE_PAUSE_CHOICES } from "../schema";
 
 type Options = {
   daily_limit: string;
@@ -30,8 +33,14 @@ type Options = {
   track_clicks: boolean;
   stop_on_reply: boolean;
   include_unsubscribe: boolean;
+  bounce_pause_percent: string; // "off" or a percent
   email_account_ids: string[];
 };
+
+const BOUNCE_ITEMS = [
+  { value: "off", label: "Off (default)" },
+  ...BOUNCE_PAUSE_CHOICES.map((p) => ({ value: String(p), label: `${p}% of the last 100 emails` })),
+];
 
 type Account = { id: string; email: string; from_name: string; status: string; daily_limit: number };
 
@@ -193,6 +202,34 @@ export function OptionsForm({
                 {gapValid &&
                   `With ${gapMin}–${gapMax} minutes, the campaign sends about ${Math.max(1, Math.floor(60 / gapMax))}–${Math.max(1, Math.floor(60 / gapMin))} emails per hour in total (and never more than the daily limits). `}
                 The shortest gap is 1 minute, because sending is checked once a minute.
+              </p>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="bounce_pause_percent">Pause when bounces reach</Label>
+              <Select
+                items={BOUNCE_ITEMS}
+                value={form.bounce_pause_percent}
+                onValueChange={(v) => set("bounce_pause_percent", String(v ?? "off"))}
+              >
+                <SelectTrigger id="bounce_pause_percent" className="w-full max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BOUNCE_ITEMS.map((b) => (
+                    <SelectItem key={b.value} value={b.value}>
+                      {b.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldErrors.bounce_pause_percent && (
+                <p className="text-xs text-destructive">{fieldErrors.bounce_pause_percent[0]}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {form.bounce_pause_percent !== "off"
+                  ? `The campaign pauses itself when ${form.bounce_pause_percent} of its last 100 emails bounced (bad addresses). You see why on the campaign page and can resume it.`
+                  : "Off: the campaign keeps sending when emails bounce. Each bounced address is still stopped and never emailed again."}
               </p>
             </div>
           </CardContent>

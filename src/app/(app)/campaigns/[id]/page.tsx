@@ -148,7 +148,12 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
           <ArrowLeftIcon className="size-4" />
           Campaigns
         </Link>
-        <CampaignHeader id={campaign.id} name={campaign.name} status={campaign.status} />
+        <CampaignHeader
+          id={campaign.id}
+          name={campaign.name}
+          status={campaign.status}
+          pausedReason={campaign.status === "paused" ? campaign.paused_reason : null}
+        />
       </div>
 
       <CampaignTabs
@@ -227,6 +232,7 @@ export default async function CampaignPage({ params, searchParams }: PageProps<"
               track_clicks: campaign.track_clicks,
               stop_on_reply: campaign.stop_on_reply,
               include_unsubscribe: campaign.include_unsubscribe,
+              bounce_pause_percent: campaign.bounce_pause_percent ? String(campaign.bounce_pause_percent) : "off",
               email_account_ids: chosenIds,
             }}
           />

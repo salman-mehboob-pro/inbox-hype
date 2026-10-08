@@ -46,6 +46,11 @@ export const optionsSchema = z
     track_clicks: z.boolean(),
     stop_on_reply: z.boolean(),
     include_unsubscribe: z.boolean(),
+    // Pause the campaign when this many of its last 100 emails bounced (= this %). "off" = off.
+    bounce_pause_percent: z.preprocess(
+      (v) => (v === "" || v === "off" ? null : v),
+      z.coerce.number().int().min(1, "At least 1%").max(100, "Max 100%").nullable(),
+    ),
     email_account_ids: z.array(z.uuid()).max(100),
   })
   .refine((v) => v.gap_max_minutes >= v.gap_min_minutes, {
@@ -54,6 +59,9 @@ export const optionsSchema = z
   });
 
 export type OptionsInput = z.input<typeof optionsSchema>;
+
+// Choices for "Pause when bounces reach" (% of the last 100 emails).
+export const BOUNCE_PAUSE_CHOICES = [2, 3, 4, 5, 6, 8, 10, 15, 20] as const;
 
 export const nameSchema = z.string().trim().min(1, "Enter a name").max(200, "Max 200 characters");
 

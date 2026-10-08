@@ -132,6 +132,8 @@ export type Database = {
       }
       campaigns: {
         Row: {
+          bounce_check_from: string | null
+          bounce_pause_percent: number | null
           created_at: string
           daily_limit: number
           gap_max_minutes: number
@@ -140,6 +142,7 @@ export type Database = {
           include_unsubscribe: boolean
           name: string
           next_available_at: string | null
+          paused_reason: string | null
           send_days: number[]
           started_at: string | null
           status: string
@@ -154,6 +157,8 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          bounce_check_from?: string | null
+          bounce_pause_percent?: number | null
           created_at?: string
           daily_limit?: number
           gap_max_minutes?: number
@@ -162,6 +167,7 @@ export type Database = {
           include_unsubscribe?: boolean
           name: string
           next_available_at?: string | null
+          paused_reason?: string | null
           send_days?: number[]
           started_at?: string | null
           status?: string
@@ -176,6 +182,8 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          bounce_check_from?: string | null
+          bounce_pause_percent?: number | null
           created_at?: string
           daily_limit?: number
           gap_max_minutes?: number
@@ -184,6 +192,7 @@ export type Database = {
           include_unsubscribe?: boolean
           name?: string
           next_available_at?: string | null
+          paused_reason?: string | null
           send_days?: number[]
           started_at?: string | null
           status?: string

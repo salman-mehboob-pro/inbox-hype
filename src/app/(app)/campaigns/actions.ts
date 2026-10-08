@@ -265,9 +265,17 @@ export async function startCampaign(id: string): Promise<CampaignActionResult> {
   if (problems.length) return { ok: false, problems };
 
   const supabase = await createClient();
+  const now = new Date().toISOString();
   const { error } = await supabase
     .from("campaigns")
-    .update({ status: "active", started_at: campaign.started_at ?? new Date().toISOString() })
+    .update({
+      status: "active",
+      started_at: campaign.started_at ?? now,
+      paused_reason: null,
+      // Resumed after a bounce pause: count bounces from now on, so the old ones
+      // don't pause it again at the next bounce.
+      ...(campaign.paused_reason ? { bounce_check_from: now } : {}),
+    })
     .eq("id", campaign.id);
   if (error) {
     logger.error("start campaign failed", { error, campaignId: campaign.id });
@@ -284,7 +292,10 @@ export async function pauseCampaign(id: string): Promise<CampaignActionResult> {
   if (campaign.status !== "active") return { ok: true };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("campaigns").update({ status: "paused" }).eq("id", campaign.id);
+  const { error } = await supabase
+    .from("campaigns")
+    .update({ status: "paused", paused_reason: null })
+    .eq("id", campaign.id);
   if (error) {
     logger.error("pause campaign failed", { error, campaignId: campaign.id });
     return { ok: false, error: GENERIC_ERROR };
