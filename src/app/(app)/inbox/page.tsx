@@ -181,7 +181,9 @@ export default async function InboxPage({ searchParams }: PageProps<"/inbox">) {
             ))}
           </nav>
 
-          <div className="grid min-h-0 content-start gap-3 lg:flex-1 lg:overflow-y-auto">
+          {/* auto-rows-max: rows keep their full height (the Sent list clips its
+              corners with overflow-hidden, which would let it shrink), so this box scrolls. */}
+          <div className="grid min-h-0 auto-rows-max content-start gap-3 lg:flex-1 lg:overflow-y-auto">
             {(isSent ? sentRows.length : rows.length) === 0 ? (
               <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">{emptyText}</p>
             ) : isSent ? (
