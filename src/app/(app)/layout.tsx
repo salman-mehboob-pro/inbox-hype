@@ -18,7 +18,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <SidebarProvider>
-      <AppSidebar email={user.email} workspaces={workspaces} unreadReplies={unreadReplies ?? 0} />
+      <AppSidebar
+        email={user.email}
+        isAdmin={user.isAdmin}
+        workspaces={workspaces}
+        unreadReplies={unreadReplies ?? 0}
+      />
       {/* min-w-0: wide tables scroll inside their box instead of widening the page. */}
       <SidebarInset className="min-w-0">
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">

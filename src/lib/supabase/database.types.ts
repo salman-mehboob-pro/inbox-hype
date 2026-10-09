@@ -1159,6 +1159,22 @@ export type Database = {
       create_workspace: { Args: { p_name: string }; Returns: string }
       delete_workspace: { Args: { p_workspace_id: string }; Returns: undefined }
       duplicate_campaign: { Args: { p_campaign_id: string }; Returns: string }
+      is_app_admin: { Args: never; Returns: boolean }
+      workspace_member_list: {
+        Args: never
+        Returns: {
+          added_at: string
+          email: string
+          is_admin: boolean
+          role: string
+          signed_in: boolean
+          user_id: string
+        }[]
+      }
+      add_workspace_member: { Args: { p_user_id: string }; Returns: boolean }
+      remove_workspace_member: { Args: { p_user_id: string }; Returns: undefined }
+      // Service role only. null when no account has this email.
+      find_user_id_by_email: { Args: { p_email: string }; Returns: string | null }
     }
     Enums: {
       [_ in never]: never

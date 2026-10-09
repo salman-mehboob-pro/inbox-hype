@@ -70,8 +70,8 @@ export function DeleteWorkspace({ name, canDelete }: { name: string; canDelete: 
         <CardTitle>Delete workspace</CardTitle>
         <CardDescription>
           {canDelete
-            ? "Deletes this workspace with all its inboxes, leads, campaigns, Unibox and stats. This can't be undone."
-            : "Your only workspace can't be deleted. Create another workspace first."}
+            ? "Deletes this workspace with all its inboxes, leads, campaigns, Unibox and stats. Its clients lose access. This can't be undone."
+            : "The only workspace can't be deleted. Create another workspace first."}
         </CardDescription>
       </CardHeader>
       <CardFooter>

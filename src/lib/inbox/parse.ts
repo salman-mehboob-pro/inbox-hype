@@ -60,6 +60,12 @@ export function isAutoReply(headers: Record<string, string>, subject: string): b
   return AUTO_SUBJECT_RE.test(subject);
 }
 
+// Newsletters and mailing-list mail (sent to many people, not written to us).
+export function isBulkMail(headers: Record<string, string>): boolean {
+  if (headers["list-id"] || headers["list-unsubscribe"]) return true;
+  return /^(bulk|list|junk)$/i.test(headers["precedence"]?.trim() ?? "");
+}
+
 export type DeliveryReport = {
   // true = permanent failure (5.x.x). false = delayed / temporary.
   hard: boolean;

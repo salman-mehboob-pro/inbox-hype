@@ -50,12 +50,7 @@ export function LoginForm({ next, linkExpired }: { next?: string; linkExpired: b
             </Link>
           </div>
           <SubmitButton pendingText="Logging in…">Log in</SubmitButton>
-          <p className="text-center text-sm text-muted-foreground">
-            No account yet?{" "}
-            <Link href="/signup" className="text-foreground underline-offset-4 hover:underline">
-              Sign up
-            </Link>
-          </p>
+          <p className="text-center text-sm text-muted-foreground">No account yet? Ask your admin for an invite.</p>
         </form>
       </CardContent>
     </Card>

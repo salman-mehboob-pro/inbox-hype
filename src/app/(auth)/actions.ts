@@ -12,15 +12,12 @@ export type AuthFormState = {
   message?: string;
   fieldErrors?: Record<string, string[] | undefined>;
   // Non-secret values echoed back so the form keeps them after a failed submit.
-  values?: { email?: string; workspaceName?: string };
+  values?: { email?: string };
 };
 
 function echo(formData: FormData): AuthFormState["values"] {
-  const pick = (key: string) => {
-    const v = formData.get(key);
-    return typeof v === "string" ? v : undefined;
-  };
-  return { email: pick("email"), workspaceName: pick("workspaceName") };
+  const v = formData.get("email");
+  return { email: typeof v === "string" ? v : undefined };
 }
 
 const email = z.email("Enter a valid email").trim().toLowerCase();
@@ -35,12 +32,6 @@ const loginSchema = z.object({
   next: z.string().optional(),
 });
 
-const signupSchema = z.object({
-  email,
-  password,
-  workspaceName: z.string().trim().max(100, "Max 100 characters").optional(),
-});
-
 const forgotSchema = z.object({ email });
 
 const resetSchema = z
@@ -52,10 +43,6 @@ const resetSchema = z
 
 export async function login(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
   return { ...(await loginImpl(formData)), values: echo(formData) };
-}
-
-export async function signup(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
-  return { ...(await signupImpl(formData)), values: echo(formData) };
 }
 
 async function loginImpl(formData: FormData): Promise<AuthFormState> {
@@ -80,40 +67,6 @@ async function loginImpl(formData: FormData): Promise<AuthFormState> {
   }
 
   redirect(safeNextPath(parsed.data.next));
-}
-
-async function signupImpl(formData: FormData): Promise<AuthFormState> {
-  const parsed = signupSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: {
-      emailRedirectTo: `${publicEnv.NEXT_PUBLIC_APP_URL}/auth/callback`,
-      data: { workspace_name: parsed.data.workspaceName || undefined },
-    },
-  });
-
-  if (error) {
-    if (error.code === "user_already_exists") {
-      return { error: "An account with this email already exists. Try logging in." };
-    }
-    if (error.code === "weak_password") {
-      return { error: error.message };
-    }
-    if (error.code === "over_email_send_rate_limit") {
-      return { error: "Too many emails sent. Please wait a few minutes and try again." };
-    }
-    logger.error("signup failed", { error, code: error.code });
-    return { error: "Could not create the account. Please try again." };
-  }
-
-  // Email confirmation off -> we already have a session.
-  if (data.session) redirect("/dashboard");
-
-  return { message: "Account created. Check your email for a link to confirm it." };
 }
 
 export async function forgotPassword(

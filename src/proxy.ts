@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Pages anyone can open without logging in.
-const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
+const AUTH_PAGES = ["/login", "/forgot-password"];
 const PUBLIC_PREFIXES = ["/auth/", "/reset-password"];
 
 // Refreshes the Supabase session cookie on every request and guards app pages.

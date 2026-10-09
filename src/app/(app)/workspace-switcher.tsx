@@ -32,8 +32,17 @@ import { createWorkspace, switchWorkspace } from "./workspaces/actions";
 export type WorkspaceOption = { id: string; name: string; isActive: boolean };
 
 // Bottom of the sidebar: the open workspace + the user's email in one button.
-// The menu: switch workspace, "New workspace", log out.
-export function WorkspaceSwitcher({ workspaces, email }: { workspaces: WorkspaceOption[]; email: string }) {
+// The menu: switch workspace, "New workspace" (admin only), log out.
+// Admins see every workspace; clients only the ones they were added to.
+export function WorkspaceSwitcher({
+  workspaces,
+  email,
+  isAdmin,
+}: {
+  workspaces: WorkspaceOption[];
+  email: string;
+  isAdmin: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
@@ -93,8 +102,8 @@ export function WorkspaceSwitcher({ workspaces, email }: { workspaces: Workspace
           <ChevronsUpDownIcon className="ml-auto size-4 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="start" className="min-w-56">
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+          <DropdownMenuGroup className="max-h-72 overflow-y-auto">
+            <DropdownMenuLabel>{isAdmin ? "All workspaces (admin)" : "Workspaces"}</DropdownMenuLabel>
             {workspaces.map((w) => (
               <DropdownMenuItem key={w.id} onClick={() => open(w.id)}>
                 <span className="min-w-0 flex-1 truncate">{w.name}</span>
@@ -103,11 +112,15 @@ export function WorkspaceSwitcher({ workspaces, email }: { workspaces: Workspace
             ))}
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setCreating(true)}>
-            <PlusIcon />
-            New workspace
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
+          {isAdmin && (
+            <>
+              <DropdownMenuItem onClick={() => setCreating(true)}>
+                <PlusIcon />
+                New workspace
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuGroup>
             <DropdownMenuLabel className="truncate">{email}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => logout()}>

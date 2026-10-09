@@ -39,10 +39,12 @@ const NAV = [
 
 export function AppSidebar({
   email,
+  isAdmin,
   workspaces,
   unreadReplies,
 }: {
   email: string;
+  isAdmin: boolean;
   workspaces: WorkspaceOption[];
   unreadReplies: number;
 }) {
@@ -83,7 +85,7 @@ export function AppSidebar({
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <WorkspaceSwitcher workspaces={workspaces} email={email} />
+            <WorkspaceSwitcher workspaces={workspaces} email={email} isAdmin={isAdmin} />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

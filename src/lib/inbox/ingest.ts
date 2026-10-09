@@ -3,11 +3,12 @@ import { simpleParser } from "mailparser";
 import { sanitizeEmailHtml } from "@/lib/sending/message";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import type { Json, Tables } from "@/lib/supabase/database.types";
-import { classifyInbound, extractMessageIds, parseHeaderBlock, type InboundKind } from "./parse";
+import { classifyInbound, extractMessageIds, isBulkMail, parseHeaderBlock, type InboundKind } from "./parse";
 
 // Records one incoming email (a whole raw message, from the Postal route) if it
 // belongs to one of our emails: a reply, an out-of-office, or a bounce report
-// (a reply stops the lead's sequence). Anything else is not stored.
+// (a reply stops the lead's sequence), or a new email from someone we wrote to.
+// Anything else (strangers, newsletters, notices) is not stored.
 
 type Admin = ReturnType<typeof createAdminClient>;
 type SentRef = Pick<
@@ -83,6 +84,9 @@ export async function ingestRawMessage(
   }
   const match = await findSentMessage(admin, args.accountIds, ids, leadEmail, classified.kind === "bounce");
   if (!match?.sent.email_account_id) return "ignored"; // not about one of our emails
+  // Found only by the sender's address (a new email from someone we wrote to):
+  // a newsletter or list mail from that address is not an answer to us.
+  if (match.method === "sender" && isBulkMail(fields)) return "ignored";
 
   const { data, error } = await admin.rpc("ingest_inbound", {
     p_account_id: match.sent.email_account_id,

@@ -3,6 +3,7 @@ import {
   classifyInbound,
   extractMessageIds,
   isAutoReply,
+  isBulkMail,
   isMailerDaemon,
   parseDeliveryReport,
   parseHeaderBlock,
@@ -96,6 +97,19 @@ describe("isAutoReply", () => {
   it("does not flag a normal reply", () => {
     expect(isAutoReply({}, "Re: Quick test")).toBe(false);
     expect(isAutoReply({}, "I am out of office next week, can we talk after?")).toBe(false);
+  });
+});
+
+describe("isBulkMail", () => {
+  it("flags newsletters and mailing lists", () => {
+    expect(isBulkMail({ "list-unsubscribe": "<https://news.test/u>" })).toBe(true);
+    expect(isBulkMail({ "list-id": "<team.lists.test>" })).toBe(true);
+    expect(isBulkMail({ precedence: "list" })).toBe(true);
+    expect(isBulkMail({ precedence: " Bulk " })).toBe(true);
+  });
+  it("does not flag a normal email", () => {
+    expect(isBulkMail({})).toBe(false);
+    expect(isBulkMail({ precedence: "first-class", "in-reply-to": "<a@x>" })).toBe(false);
   });
 });
 
